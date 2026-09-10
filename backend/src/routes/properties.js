@@ -1,0 +1,467 @@
+import { randomUUID } from 'crypto'
+import { Router } from 'express'
+import multer from 'multer'
+import { supabase } from '../lib/supabaseClient.js'
+import { requireAuth } from '../middleware/auth.js'
+
+const router = Router()
+const upload = multer({ storage: multer.memoryStorage() })
+
+const PRICING_FIELDS = [
+  'rent_amount',
+  'agency_fee',
+  'agreement_fee',
+  'caution_fee',
+  'service_charge',
+  'other_fee',
+]
+
+const EDITABLE_FIELDS = [
+  'title',
+  'description',
+  'property_type',
+  'bedrooms',
+  'bathrooms',
+  'toilets',
+  'furnished',
+  'amenities',
+  'ward_id',
+  'street',
+  ...PRICING_FIELDS,
+]
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function toNullableNumber(value) {
+  if (value === undefined || value === null || value === '') return null
+  const num = Number(value)
+  return Number.isNaN(num) ? null : num
+}
+
+function toNullableInt(value) {
+  const num = toNullableNumber(value)
+  return num === null ? null : Math.trunc(num)
+}
+
+function computeMoveInCost(property) {
+  let total = 0
+  let anyProvided = false
+  const notProvided = []
+
+  for (const field of PRICING_FIELDS) {
+    const value = property[field]
+    if (value === null || value === undefined) {
+      notProvided.push(field)
+    } else {
+      total += Number(value)
+      anyProvided = true
+    }
+  }
+
+  return { total: anyProvided ? total : null, notProvided }
+}
+
+async function findOrCreateNeighborhood(wardId, name, createdBy) {
+  const trimmed = name.trim()
+
+  const { data: existing, error: findError } = await supabase
+    .from('neighborhoods')
+    .select('id')
+    .eq('ward_id', wardId)
+    .ilike('name', trimmed)
+    .maybeSingle()
+
+  if (findError) {
+    throw new Error(`Failed to look up neighborhood: ${findError.message}`)
+  }
+
+  if (existing) return existing.id
+
+  const { data: created, error: createError } = await supabase
+    .from('neighborhoods')
+    .insert({ ward_id: wardId, name: trimmed, created_by: createdBy })
+    .select('id')
+    .single()
+
+  if (createError) {
+    // Race: someone else created the same (ward_id, name) between our
+    // select and insert — fall back to re-selecting it.
+    if (createError.code === '23505') {
+      const { data: retry } = await supabase
+        .from('neighborhoods')
+        .select('id')
+        .eq('ward_id', wardId)
+        .ilike('name', trimmed)
+        .maybeSingle()
+      if (retry) return retry.id
+    }
+    throw new Error(`Failed to create neighborhood: ${createError.message}`)
+  }
+
+  return created.id
+}
+
+function buildPropertyPayload(body) {
+  const payload = {}
+
+  for (const field of EDITABLE_FIELDS) {
+    if (!(field in body)) continue
+
+    if (PRICING_FIELDS.includes(field)) {
+      payload[field] = toNullableNumber(body[field])
+    } else if (['bedrooms', 'bathrooms', 'toilets'].includes(field)) {
+      payload[field] = toNullableInt(body[field])
+    } else if (field === 'ward_id') {
+      payload[field] = toNullableInt(body[field])
+    } else if (field === 'amenities') {
+      payload[field] = Array.isArray(body.amenities) ? body.amenities : []
+    } else {
+      payload[field] = body[field]
+    }
+  }
+
+  return payload
+}
+
+const LOCATION_JOIN =
+  'ward:ward_id(id,name,lga:lga_id(id,name,state:state_id(id,name))),neighborhood:neighborhood_id(id,name)'
+
+router.post('/', requireAuth, async (req, res) => {
+  if (!['landlord', 'agent'].includes(req.profile.role)) {
+    return res.status(403).json({
+      error: 'Only landlords or agents can create property listings',
+    })
+  }
+
+  const body = req.body || {}
+
+  if (!body.title) {
+    return res.status(400).json({ error: 'title is required' })
+  }
+  if (!body.property_type) {
+    return res.status(400).json({ error: 'property_type is required' })
+  }
+
+  const wardId = toNullableInt(body.ward_id)
+  if (!wardId) {
+    return res.status(400).json({ error: 'ward_id is required' })
+  }
+
+  let neighborhoodId = toNullableInt(body.neighborhood_id)
+
+  if (!neighborhoodId && body.neighborhood_name) {
+    try {
+      neighborhoodId = await findOrCreateNeighborhood(
+        wardId,
+        body.neighborhood_name,
+        req.profile.id,
+      )
+    } catch (error) {
+      return res.status(500).json({ error: error.message })
+    }
+  }
+
+  if (!neighborhoodId) {
+    return res
+      .status(400)
+      .json({ error: 'neighborhood_id or neighborhood_name is required' })
+  }
+
+  const payload = {
+    ...buildPropertyPayload(body),
+    ward_id: wardId,
+    neighborhood_id: neighborhoodId,
+    owner_id: req.profile.id,
+    status: 'draft',
+  }
+
+  const { data, error } = await supabase
+    .from('properties')
+    .insert(payload)
+    .select(`*, ${LOCATION_JOIN}`)
+    .single()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  res.status(201).json(data)
+})
+
+router.patch('/:id', requireAuth, async (req, res) => {
+  const { id } = req.params
+
+  if (!UUID_RE.test(id)) {
+    return res.status(404).json({ error: `Property ${id} not found` })
+  }
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('properties')
+    .select('id, owner_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchError) {
+    return res.status(500).json({ error: 'Failed to look up property' })
+  }
+  if (!existing) {
+    return res.status(404).json({ error: `Property ${id} not found` })
+  }
+  if (existing.owner_id !== req.profile.id) {
+    return res
+      .status(403)
+      .json({ error: 'You do not own this property' })
+  }
+
+  const body = req.body || {}
+  const payload = buildPropertyPayload(body)
+
+  if ('neighborhood_id' in body || 'neighborhood_name' in body) {
+    let neighborhoodId = toNullableInt(body.neighborhood_id)
+    const wardId = 'ward_id' in payload ? payload.ward_id : undefined
+
+    if (!neighborhoodId && body.neighborhood_name) {
+      if (!wardId) {
+        return res.status(400).json({
+          error: 'ward_id is required when setting neighborhood_name',
+        })
+      }
+      try {
+        neighborhoodId = await findOrCreateNeighborhood(
+          wardId,
+          body.neighborhood_name,
+          req.profile.id,
+        )
+      } catch (error) {
+        return res.status(500).json({ error: error.message })
+      }
+    }
+
+    if (neighborhoodId) payload.neighborhood_id = neighborhoodId
+  }
+
+  if (body.status) {
+    payload.status = body.status
+  }
+
+  payload.updated_at = new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from('properties')
+    .update(payload)
+    .eq('id', id)
+    .select(`*, ${LOCATION_JOIN}`)
+    .single()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  res.json(data)
+})
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  const { id } = req.params
+
+  if (!UUID_RE.test(id)) {
+    return res.status(404).json({ error: `Property ${id} not found` })
+  }
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('properties')
+    .select('id, owner_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchError) {
+    return res.status(500).json({ error: 'Failed to look up property' })
+  }
+  if (!existing) {
+    return res.status(404).json({ error: `Property ${id} not found` })
+  }
+  if (existing.owner_id !== req.profile.id) {
+    return res
+      .status(403)
+      .json({ error: 'You do not own this property' })
+  }
+
+  const { data, error } = await supabase
+    .from('properties')
+    .update({ status: 'unavailable', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  res.json(data)
+})
+
+router.get('/', async (req, res) => {
+  const pageSize = 20
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const { data, error, count } = await supabase
+    .from('properties')
+    .select(
+      `id, title, property_type, bedrooms, bathrooms, status,
+       rent_amount, agency_fee, agreement_fee, caution_fee, service_charge, other_fee,
+       ${LOCATION_JOIN},
+       property_images(url, sort_order)`,
+      { count: 'exact' },
+    )
+    .eq('status', 'available')
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  const items = data.map((property) => {
+    const images = [...(property.property_images || [])].sort(
+      (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
+    )
+    const { property_images, ...rest } = property
+    return {
+      ...rest,
+      first_image: images[0]?.url ?? null,
+      move_in_cost: computeMoveInCost(property),
+    }
+  })
+
+  res.json({
+    items,
+    page,
+    pageSize,
+    total: count,
+    totalPages: Math.ceil((count ?? 0) / pageSize),
+  })
+})
+
+router.get('/:id', async (req, res) => {
+  const { id } = req.params
+
+  if (!UUID_RE.test(id)) {
+    return res.status(404).json({ error: `Property ${id} not found` })
+  }
+
+  const { data: property, error } = await supabase
+    .from('properties')
+    .select(`*, ${LOCATION_JOIN}, property_images(id, url, sort_order)`)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  // This endpoint is public (no auth required), and the backend uses
+  // the service-role key which bypasses RLS — so we replicate the
+  // same "available, or you own it" visibility rule from the
+  // properties RLS policy here in application code. A token is
+  // optional: if one is present and it resolves to the owner, they
+  // can view their own non-available (e.g. draft) listing too.
+  let isOwner = false
+  const authHeader = req.headers.authorization || ''
+  if (authHeader.startsWith('Bearer ') && property) {
+    const token = authHeader.slice('Bearer '.length)
+    const { data: authData } = await supabase.auth.getUser(token)
+    if (authData?.user?.id === property.owner_id) {
+      isOwner = true
+    }
+  }
+
+  if (!property || (property.status !== 'available' && !isOwner)) {
+    return res.status(404).json({ error: `Property ${id} not found` })
+  }
+
+  const images = [...(property.property_images || [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
+  )
+
+  res.json({
+    ...property,
+    images,
+    move_in_cost: computeMoveInCost(property),
+  })
+})
+
+router.post(
+  '/:id/images',
+  requireAuth,
+  upload.array('images'),
+  async (req, res) => {
+    const { id } = req.params
+
+    if (!UUID_RE.test(id)) {
+      return res.status(404).json({ error: `Property ${id} not found` })
+    }
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('properties')
+      .select('id, owner_id')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (fetchError) {
+      return res.status(500).json({ error: 'Failed to look up property' })
+    }
+    if (!existing) {
+      return res.status(404).json({ error: `Property ${id} not found` })
+    }
+    if (existing.owner_id !== req.profile.id) {
+      return res
+        .status(403)
+        .json({ error: 'You do not own this property' })
+    }
+
+    const files = req.files || []
+    if (files.length === 0) {
+      return res.status(400).json({ error: 'No images provided' })
+    }
+
+    const uploaded = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const path = `${id}/${randomUUID()}-${file.originalname}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('property-images')
+        .upload(path, file.buffer, { contentType: file.mimetype })
+
+      if (uploadError) {
+        return res.status(500).json({ error: uploadError.message })
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('property-images')
+        .getPublicUrl(path)
+
+      uploaded.push({
+        property_id: id,
+        url: publicUrlData.publicUrl,
+        sort_order: i,
+      })
+    }
+
+    const { data, error } = await supabase
+      .from('property_images')
+      .insert(uploaded)
+      .select()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.status(201).json(data)
+  },
+)
+
+export default router

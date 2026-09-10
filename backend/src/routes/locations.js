@@ -84,4 +84,38 @@ router.get('/lgas/:lgaId/wards', async (req, res) => {
   res.json(data)
 })
 
+router.get('/wards/:wardId/neighborhoods', async (req, res) => {
+  const { wardId } = req.params
+
+  if (!/^\d+$/.test(wardId)) {
+    return res.status(404).json({ error: `Ward ${wardId} not found` })
+  }
+
+  const { data: ward, error: wardError } = await supabase
+    .from('wards')
+    .select('id')
+    .eq('id', wardId)
+    .maybeSingle()
+
+  if (wardError) {
+    return res.status(500).json({ error: 'Failed to look up ward' })
+  }
+
+  if (!ward) {
+    return res.status(404).json({ error: `Ward ${wardId} not found` })
+  }
+
+  const { data, error } = await supabase
+    .from('neighborhoods')
+    .select('id, name')
+    .eq('ward_id', wardId)
+    .order('name', { ascending: true })
+
+  if (error) {
+    return res.status(500).json({ error: 'Failed to fetch neighborhoods' })
+  }
+
+  res.json(data)
+})
+
 export default router

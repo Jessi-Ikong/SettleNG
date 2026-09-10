@@ -231,3 +231,58 @@ How to test this yourself:
 4. See LocationPicker working: open http://localhost:5173/ (the landing page) — the three chained chips are visible right below the Log in/Register links. Pick "Lagos" (the only option, since it's the only active state), then pick any LGA, then any ward. Open the browser console to see each selection logged as {stateId, lgaId, wardId}. This is a temporary placement — remove it from Landing.jsx once LocationPicker gets wired into real search/property-creation pages in a later phase.
 
 Notes: Flag the dataset URL correction (data/full.json, not full.json at repo root) to whoever wrote the original spec, in case other tooling/docs reference the same wrong path. Neighborhoods and streets are intentionally not part of this schema yet, per your instructions — they'll be agent/landlord-submitted free text in the properties phase, not seeded reference data.
+
+---
+Date: 2026-09-10
+Feature/Task: Properties — CRUD, images, cost transparency, listing/detail/browse pages
+Files changed:
+- backend/sql/004_properties.sql (new — property_type/furnished_status/property_status enums, neighborhoods/properties/property_images tables, indexes, RLS policies, run by product owner)
+- backend/src/routes/properties.js (new — POST/PATCH/DELETE /api/properties, GET list + detail, POST /:id/images; find-or-create neighborhood helper; move-in-cost computation)
+- backend/src/routes/locations.js (edited — added GET /wards/:wardId/neighborhoods)
+- backend/src/index.js (edited — wired /api/properties)
+- backend/package.json (edited — added multer for multipart image uploads)
+- frontend/src/lib/amenities.js (new — AMENITIES/PROPERTY_TYPES/FURNISHED_STATUSES/PRICING_FIELDS constants from the master spec)
+- frontend/src/lib/api.js (unchanged, reused)
+- frontend/src/pages/CreateProperty.jsx (new — protected, role-gated form: amenities checkboxes, LocationPicker, neighborhood typeahead, 6 pricing fields with "leave blank" placeholders, multi-file upload with thumbnail previews)
+- frontend/src/pages/PropertyDetail.jsx (new — public, gallery, signpost-trail location chips, full cost breakdown table, "Not yet verified" grey badge)
+- frontend/src/pages/PropertyList.jsx (new — public browse grid with Next/Previous pagination)
+- frontend/src/components/Nav.jsx (new — persistent site nav; shows "List a property" only to logged-in landlord/agent)
+- frontend/src/App.jsx (edited — added Nav, /create-property, /properties, /properties/:id routes)
+- frontend/src/pages/Landing.jsx (edited — removed the temporary LocationPicker preview from Phase 2, now that it's wired into a real page; added a Browse link)
+- frontend/src/index.css (edited — added nav, create-property form, property-detail, and property-list styles using existing design tokens)
+
+What was tested (by Claude Code):
+- Storage bucket: the product owner reported creating "property-images" in the dashboard, but it did NOT actually exist (confirmed via GET /storage/v1/bucket returning []). Created it myself via the Storage API (POST /storage/v1/bucket, public:true) using the service key — a fully supported method, not a workaround. Flagging this in case the dashboard click didn't save for some other reason worth knowing about.
+- Backend, via curl with real accounts: tenant POST /api/properties → 403 "Only landlords or agents can create property listings". Landlord POST with 4 of 6 fees filled → 201, status:"draft", neighborhood_name "Adekunle Village" correctly find-or-created (new row) under the given ward, service_charge/other_fee correctly null (not 0).
+- Confirmed draft properties are invisible on GET /api/properties (empty list) and GET /api/properties/:id (404) to the public.
+- Created a second landlord account and confirmed PATCH and DELETE on the first landlord's property both return 403 "You do not own this property".
+- PATCHed status draft→available as the actual owner (200), then confirmed the property now appears in both the list and detail endpoints, with move_in_cost.total correctly summing only the provided fees and notProvided listing exactly the null ones.
+- Tested soft delete on a throwaway property: DELETE returns the row with status:"unavailable", and a direct service-role query confirms the row still exists (not actually deleted).
+- Tested image upload via curl (multipart) — uploaded to Supabase Storage, public URL returned, reachable (200), and reflected in both property_images and the detail/list API responses.
+- FOUND AND FIXED A REAL BUG: initially built GET /api/properties/:id to only ever serve status='available' properties (reasoning: it's a "public" route with no auth middleware, so I dropped the "or owner_id = auth.uid()" half of the RLS policy). This meant a landlord got redirected to their own brand-new draft listing right after creating it and saw "Not found" — confirmed live in the browser before fixing. Fixed by having the route optionally check for a Bearer token (still no auth required to call it) and allowing the owner to see their own non-available listing, matching the actual RLS policy in 004_properties.sql exactly. Also updated the frontend to send the token when one exists. Retested and confirmed working.
+- Drove the ENTIRE flow live in a browser (not just curl): logged in as tenant, tried /create-property, got redirected with "Not available: Only landlords and agents can list a property" and confirmed the nav hides "List a property" for tenants. Logged in as landlord, confirmed nav shows "List a property".
+- Created property #1 with ALL SIX pricing fields filled (Rent ₦2,500,000 + Agency ₦250,000 + Agreement ₦250,000 + Caution ₦200,000 + Service ₦50,000 + Other ₦30,000) through the real form — detail page correctly showed every fee and a total of ₦3,280,000 (verified the arithmetic).
+- Created property #2 with only Rent (₦600,000) and Agency Fee (₦60,000) filled, the other four left blank — detail page correctly showed "Not provided" (muted/italic style) for Agreement Fee, Caution Fee, Service Charge, and Other, and a total of ₦660,000 (only the two provided fees, never invented).
+- Created property #3 with ALL pricing fields left blank — confirmed "Estimated Move-in Cost" itself correctly shows "Not provided" rather than ₦0 or blank.
+- Uploaded a real image through the actual file input (not curl) on property #3 — thumbnail preview rendered before submit, and after submit the image appeared correctly on the detail page and resolved to a working public URL.
+- Verified amenity checkboxes: found my first automated click attempts weren't registering (a UI-automation hit-target issue, confirmed via direct DOM inspection — not a code bug), switched to a more reliable interaction method and confirmed selected amenities ("prepaid meter", "parking") saved correctly and rendered as tags on the detail page.
+- Verified the LocationPicker inside the create form works with both active states (Lagos AND Cross River — confirms the "set Cross River active" change from earlier is live end-to-end), correctly chaining LGA → ward.
+- Published all three test properties (draft → available) and confirmed all three appear correctly on the public /properties browse page with correct thumbnails (or "No photo" placeholder), location strings, move-in costs, and availability badges, with pagination showing "Page 1 of 1".
+
+Expected result:
+- Full landlord/agent-only create flow with correct role gating, ownership enforcement, draft/available visibility rules, accurate cost transparency (never inventing missing fees), and working image upload — all matching README's cost transparency and "never trust frontend for user_id/role" rules
+
+Actual result:
+- Matches expected, after fixing the draft-visibility gap described above
+
+Status: PASS
+
+How to test this yourself:
+1. Create a landlord (or agent) account: register at /register and pick "Landlord" or "Agent" from the role dropdown (Admin isn't offered, same as before). To confirm a tenant is blocked: log in as a tenant account and visit /create-property directly — you should see "Not available: Only landlords and agents can list a property," and the nav bar should NOT show a "List a property" link for that account.
+2. Create one property with ALL pricing fields filled (log in as landlord/agent, go to /create-property, fill Rent/Agency Fee/Agreement Fee/Caution Fee/Service Charge/Other with real numbers) and a second with SOME left blank. After creating each, you land on its detail page: the fully-filled one shows every fee as a real ₦ amount plus a matching total; the partially-filled one shows "Not provided" in muted text for each blank fee (never ₦0 or a guessed number), and the total only adds up the fees that were actually provided.
+3. Upload images: on the create form, use the Photos field to select one or more images — thumbnails should preview before you submit. After submitting, the property's detail page should show those images in a gallery instead of "No photos yet".
+4. Confirm draft vs. available visibility: right after creating a property, note its status is "draft" — visit /properties (the public browse page) and confirm it does NOT appear there. It should also not be visible if you open its detail link in an incognito window (no session) yet — but the owner CAN see it since the API allows the owner to preview their own draft. Then update its status via `curl -X PATCH http://localhost:5050/api/properties/<id> -H "Authorization: Bearer <your token>" -H "Content-Type: application/json" -d "{\"status\":\"available\"}"` (grab your token from DevTools localStorage the same way as the auth phase) — refresh /properties and confirm it now appears.
+5. Confirm cross-owner protection: create a second landlord account, grab its access token, and try `curl -X PATCH http://localhost:5050/api/properties/<first landlord's property id> -H "Authorization: Bearer <second landlord's token>" -H "Content-Type: application/json" -d "{\"title\":\"hijacked\"}"` — expect 403 {"error":"You do not own this property"}. Same for DELETE.
+
+Notes: Left 4 real test properties in the Supabase project from this session (2 published Lagos ones with full/partial pricing, 1 published Cross River one, 1 draft "UI Image Upload Test" with an uploaded test image and no pricing at all) — safe to delete via the Supabase dashboard or leave as demo data, your call. Also left 2 test landlord accounts (settleng.landlord.qa1@gmail.com, settleng.landlord.qa2@gmail.com, both password TestPass123!). One design decision worth confirming with you: the "owner can preview their own draft" behavior I added isn't explicitly in the spec — it matches the RLS policy's intent exactly, but if you'd rather drafts be truly invisible to everyone including the owner until published, let me know and I'll revert that part.
+    

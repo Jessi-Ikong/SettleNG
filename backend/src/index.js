@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import meRouter from './routes/me.js'
 import locationsRouter from './routes/locations.js'
+import propertiesRouter from './routes/properties.js'
 
 const app = express()
 const PORT = process.env.PORT || 5050
@@ -16,6 +17,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/me', meRouter)
 app.use('/api/locations', locationsRouter)
+app.use('/api/properties', propertiesRouter)
 
 app.listen(PORT, () => {
   console.log(`SettleNG API listening on port ${PORT}`)
