@@ -315,4 +315,47 @@ How to test this yourself:
 4. If you still see a blank page or a console error mentioning PropertyDetail after clicking Publish, that's a regression of the bug described above
 
 Notes: This also fully explains and resolves the "my listing disappeared" report — nothing was ever lost; the listing was in draft the whole time and there was previously no way to publish it from the UI. Product owner's real listing ("Well-furnished room and parlour") is now published and visible on Browse.
+
+---
+Date: 2026-09-10
+Feature/Task: Search & filters — extended GET /api/properties, SearchFilters panel, sort, pagination
+Files changed:
+- backend/src/routes/properties.js (edited — GET / now accepts state_id/lga_id/ward_id/neighborhood_id/property_type/min_price/max_price/bedrooms/furnished/amenities/sort/page/limit, all combinable and defensively validated; added resolveLocationFilter() to resolve state/lga down to a ward_id list, PROPERTY_TYPE_VALUES/FURNISHED_VALUES/SORT_VALUES allow-lists, parsePositiveInt/parseNonNegativeNumber helpers)
+- frontend/src/components/SearchFilters.jsx (new — LocationPicker + neighborhood dropdown, property type, min/max rent, bedrooms pill selector, furnished dropdown, amenities checkboxes, Clear filters button)
+- frontend/src/components/LocationPicker.jsx (edited — added optional `initialValue` prop so it can be pre-populated from the URL on load/refresh; CreateProperty.jsx's existing usage is unaffected since the prop is optional)
+- frontend/src/pages/PropertyList.jsx (rewritten — filters/sort/page now live in the URL via useSearchParams, sidebar layout with SearchFilters, sort dropdown, pluralized result count, empty state with "Clear filters", pagination that preserves active filters/sort, collapsible filters on narrow widths)
+- frontend/src/index.css (edited — search-filters panel styles, filter pills, property-list two-column layout with a mobile breakpoint that collapses the sidebar behind a "Show/Hide filters" toggle, empty-state styles)
+
+What was tested (by Claude Code):
+- Published the one Phase-3 test property that had every pricing field null ("UI Image Upload Test") specifically so the null-rent sort behavior this phase explicitly asks about could be tested against real data, per your instruction to reference "the all-blank-pricing test property from Phase 3."
+- Backend, via curl, against the 6 available test properties now in the database: state_id=9 (Cross River) → 3 correct matches; lga_id=516 (Ikeja) → 3; ward_id=5875 → 2; property_type=duplex → 1; bedrooms=2 (exact) → 2; bedrooms=4 (should mean >=4) → 0, correctly, since no test property has 4+ bedrooms; min_price=1000000 → 3; max_price=500000 → 1; combined state_id=9&bedrooms=2 → 1 (narrowing works together).
+- amenities=prepaid meter,parking → 4 properties (all that have BOTH, not just one); adding security narrowed it to exactly the 2 that have all three — confirms the "ALL listed amenities" AND-matching (Postgres array `contains`), not OR.
+- sort=price_low and sort=price_high both tested: real ascending/descending order by rent_amount confirmed in both directions, and in BOTH directions the null-rent property sorted dead last, never first — this was the main risk called out in the spec (nulls-as-zero would've put it first on price_high) and it's correctly avoided via `nullsFirst: false`.
+- Defensive validation: property_type=mansion (invalid enum) → ignored, all 6 still returned, no error. sort=bogus → silently fell back to newest, no error. bedrooms=abc&min_price=xyz (non-numeric) → both ignored, full unfiltered result returned, HTTP 200 throughout — confirms a bad filter never breaks the whole request.
+- Zero-result case: min_price=99999999 → {"items":[],"total":0,"totalPages":0}, no error.
+- Full browser-driven test: opened /properties, selected Cross River in the LocationPicker sidebar — confirmed the URL updated live to ?state_id=9 with no page reload; clicked the "2" bedrooms pill — URL became ?state_id=9&bedrooms=2 and the grid correctly narrowed to the single matching property. Reloaded the page at that URL directly — confirmed the LocationPicker's State dropdown, the LGA list (all 18 Cross River LGAs, via the new initialValue prop), the "2" bedrooms pill (active state), and the filtered single result all came back correctly from the URL alone — filters survive a refresh as required.
+- Navigated directly to ?min_price=99999999 — confirmed the empty state renders ("0 properties found" / "No properties match your filters." / a working Clear filters button), not a blank grid.
+- Clicked Clear filters from that empty state — confirmed it reset the URL to bare /properties and all 6 properties returned.
+- Navigated to ?sort=price_low and read the actual rendered card order via the DOM — confirmed it matches the curl-verified order exactly, with "UI Image Upload Test" (null rent) last.
+- Found and fixed a small copy bug while testing: the result count said "1 properties found" for a single result — fixed to correctly pluralize ("1 property found" / "N properties found").
+
+Expected result:
+- All filters combinable and correctly narrowing; invalid params ignored rather than erroring; null rent never sorts first in either direction; URL fully round-trips a search (shareable/bookmarkable/refresh-safe); clear empty state; pagination that respects active filters
+
+Actual result:
+- Matches expected, including the copy fix
+
+Status: PASS
+
+How to test this yourself:
+1. curl examples (backend on port 5050, using the current test data — 6 available properties, 3 in Cross River / 3 in Lagos):
+   - `curl "http://localhost:5050/api/properties?state_id=9&bedrooms=2"` → expect total:1 ("Virgin 2 bedroom self-contained apartment")
+   - `curl "http://localhost:5050/api/properties?min_price=1000000"` → expect total:3, all with rent_amount >= 1,000,000
+   - `curl "http://localhost:5050/api/properties?amenities=prepaid%20meter,parking,security"` → expect total:2 (only properties with ALL three amenities, not just one)
+   - `curl "http://localhost:5050/api/properties?sort=price_low"` → expect ascending rent_amount order with the null-rent "UI Image Upload Test" listed LAST, not first
+2. Filter UI: open http://localhost:5173/properties, pick a state in the sidebar LocationPicker, click a bedrooms pill, and optionally check an amenity or set a min rent. Watch the address bar — it should update live with matching query params (e.g. ?state_id=25&bedrooms=2). Refresh the page: the same filters and the same filtered results should still be there, not reset to the full unfiltered list.
+3. Zero-result case: visit http://localhost:5173/properties?min_price=99999999 directly — expect "0 properties found" and a message with a "Clear filters" button, not a blank grid. Click it and confirm all properties return.
+4. Null-sort confirmation: visit http://localhost:5173/properties?sort=price_low and scroll to the bottom of the results — the property with no rent set ("UI Image Upload Test", or whichever test property has blank pricing) should be last, never first. Repeat with sort=price_high — it should still be last, not first (a naive "nulls sort as zero" implementation would incorrectly put it first here).
+
+Notes: min_price/max_price filter on rent_amount only (not total move-in cost), per your instruction, since total cost has too many nulls to filter on reliably — worth surfacing that distinction in the UI copy if users seem confused (I labeled the inputs "Rent (₦)" with "Min rent"/"Max rent" placeholders for this reason). The neighborhood filter dropdown only populates once a ward is selected, matching how neighborhoods are scoped in the schema (they belong to a ward, not directly to an LGA/state).
     

@@ -520,8 +520,175 @@ a {
 
 .property-list-page {
   padding: 32px 24px 64px;
-  max-width: 1100px;
+  max-width: 1300px;
   margin: 0 auto;
+}
+
+.property-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.filters-toggle {
+  display: none;
+}
+
+.property-list-layout {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  margin-top: 20px;
+}
+
+.filters-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
+}
+
+.property-list-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.property-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.result-count {
+  font-weight: 500;
+}
+
+.sort-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.sort-select select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(23, 48, 74, 0.25);
+  font-family: var(--font-body);
+}
+
+.empty-state {
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.empty-state p {
+  margin: 0 0 16px;
+  opacity: 0.7;
+}
+
+@media (max-width: 860px) {
+  .filters-toggle {
+    display: inline-block;
+  }
+
+  .property-list-layout {
+    flex-direction: column;
+  }
+
+  .filters-sidebar {
+    width: 100%;
+    position: static;
+    display: none;
+  }
+
+  .filters-sidebar.filters-open {
+    display: block;
+  }
+}
+
+/* --- Search filters --- */
+
+.search-filters {
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-label {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.filter-group select,
+.filter-group input[type='number'] {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border: 1px solid rgba(23, 48, 74, 0.25);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--color-ink);
+}
+
+.filter-price-row {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-price-row input {
+  width: 0;
+  flex: 1;
+}
+
+.filter-pill-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(23, 48, 74, 0.25);
+  background: #fff;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.filter-pill-active {
+  background: var(--color-indigo);
+  border-color: var(--color-indigo);
+  color: #fff;
+}
+
+.filter-amenities-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 .property-card-grid {

@@ -127,6 +127,81 @@ function buildPropertyPayload(body) {
 const LOCATION_JOIN =
   'ward:ward_id(id,name,lga:lga_id(id,name,state:state_id(id,name))),neighborhood:neighborhood_id(id,name)'
 
+const PROPERTY_TYPE_VALUES = [
+  'self_contained',
+  'room_and_parlour',
+  '1_bedroom',
+  '2_bedroom',
+  '3_bedroom',
+  '4plus_bedroom',
+  'duplex',
+  'bungalow',
+  'detached_house',
+  'semi_detached_house',
+  'shared_accommodation',
+  'studio',
+  'serviced_apartment',
+  'other',
+]
+
+const FURNISHED_VALUES = ['furnished', 'unfurnished', 'partly_furnished']
+
+const SORT_VALUES = ['newest', 'oldest', 'price_low', 'price_high']
+
+function parsePositiveInt(value) {
+  if (value === undefined || value === null || value === '') return null
+  if (!/^\d+$/.test(String(value))) return null
+  return parseInt(value, 10)
+}
+
+function parseNonNegativeNumber(value) {
+  if (value === undefined || value === null || value === '') return null
+  const num = Number(value)
+  if (Number.isNaN(num) || num < 0) return null
+  return num
+}
+
+// Resolves a location query into either a specific neighborhood_id
+// filter, or a list of ward_ids to filter by — using whichever of
+// neighborhood_id/ward_id/lga_id/state_id is most specific. Combining
+// a broader level with a narrower one (e.g. state_id + ward_id) just
+// narrows to the more specific one, since a ward already implies a
+// single lga/state.
+async function resolveLocationFilter(query) {
+  const neighborhoodId = parsePositiveInt(query.neighborhood_id)
+  if (neighborhoodId) return { type: 'neighborhood', neighborhoodId }
+
+  const wardId = parsePositiveInt(query.ward_id)
+  if (wardId) return { type: 'wards', wardIds: [wardId] }
+
+  const lgaId = parsePositiveInt(query.lga_id)
+  if (lgaId) {
+    const { data } = await supabase
+      .from('wards')
+      .select('id')
+      .eq('lga_id', lgaId)
+    return { type: 'wards', wardIds: (data || []).map((w) => w.id) }
+  }
+
+  const stateId = parsePositiveInt(query.state_id)
+  if (stateId) {
+    const { data: lgas } = await supabase
+      .from('lgas')
+      .select('id')
+      .eq('state_id', stateId)
+    const lgaIds = (lgas || []).map((l) => l.id)
+    if (lgaIds.length === 0) return { type: 'wards', wardIds: [] }
+
+    const { data: wards } = await supabase
+      .from('wards')
+      .select('id')
+      .in('lga_id', lgaIds)
+    return { type: 'wards', wardIds: (wards || []).map((w) => w.id) }
+  }
+
+  return { type: 'none' }
+}
+
 router.post('/', requireAuth, async (req, res) => {
   if (!['landlord', 'agent'].includes(req.profile.role)) {
     return res.status(403).json({
@@ -301,23 +376,89 @@ router.delete('/:id', requireAuth, async (req, res) => {
 })
 
 router.get('/', async (req, res) => {
-  const pageSize = 20
-  const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+  const q = req.query
+
+  const page = Math.max(1, parsePositiveInt(q.page) || 1)
+  const pageSize = Math.min(100, Math.max(1, parsePositiveInt(q.limit) || 20))
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
-  const { data, error, count } = await supabase
+  const locationFilter = await resolveLocationFilter(q)
+
+  // A resolved-but-empty ward list (e.g. a state/lga with no wards)
+  // can never match anything — short-circuit instead of sending
+  // `.in('ward_id', [])`, which PostgREST doesn't handle predictably.
+  if (locationFilter.type === 'wards' && locationFilter.wardIds.length === 0) {
+    return res.json({ items: [], page, pageSize, total: 0, totalPages: 0 })
+  }
+
+  let query = supabase
     .from('properties')
     .select(
-      `id, title, property_type, bedrooms, bathrooms, status,
+      `id, title, property_type, bedrooms, bathrooms, status, created_at,
        rent_amount, agency_fee, agreement_fee, caution_fee, service_charge, other_fee,
        ${LOCATION_JOIN},
        property_images(url, sort_order)`,
       { count: 'exact' },
     )
     .eq('status', 'available')
-    .order('created_at', { ascending: false })
-    .range(from, to)
+
+  if (locationFilter.type === 'neighborhood') {
+    query = query.eq('neighborhood_id', locationFilter.neighborhoodId)
+  } else if (locationFilter.type === 'wards') {
+    query = query.in('ward_id', locationFilter.wardIds)
+  }
+
+  if (
+    q.property_type &&
+    PROPERTY_TYPE_VALUES.includes(String(q.property_type))
+  ) {
+    query = query.eq('property_type', q.property_type)
+  }
+
+  if (q.furnished && FURNISHED_VALUES.includes(String(q.furnished))) {
+    query = query.eq('furnished', q.furnished)
+  }
+
+  const minPrice = parseNonNegativeNumber(q.min_price)
+  if (minPrice !== null) query = query.gte('rent_amount', minPrice)
+
+  const maxPrice = parseNonNegativeNumber(q.max_price)
+  if (maxPrice !== null) query = query.lte('rent_amount', maxPrice)
+
+  const bedrooms = parsePositiveInt(q.bedrooms)
+  if (bedrooms !== null) {
+    query =
+      bedrooms >= 4
+        ? query.gte('bedrooms', 4)
+        : query.eq('bedrooms', bedrooms)
+  }
+
+  if (q.amenities) {
+    const amenities = String(q.amenities)
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean)
+    if (amenities.length > 0) {
+      query = query.contains('amenities', amenities)
+    }
+  }
+
+  const sort = SORT_VALUES.includes(String(q.sort)) ? q.sort : 'newest'
+  if (sort === 'newest') {
+    query = query.order('created_at', { ascending: false })
+  } else if (sort === 'oldest') {
+    query = query.order('created_at', { ascending: true })
+  } else if (sort === 'price_low') {
+    query = query.order('rent_amount', { ascending: true, nullsFirst: false })
+  } else if (sort === 'price_high') {
+    query = query.order('rent_amount', {
+      ascending: false,
+      nullsFirst: false,
+    })
+  }
+
+  const { data, error, count } = await query.range(from, to)
 
   if (error) {
     return res.status(500).json({ error: error.message })

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { API_BASE_URL } from '../lib/api'
 
-export default function LocationPicker({ onChange }) {
+export default function LocationPicker({ onChange, initialValue }) {
   const [states, setStates] = useState([])
   const [lgas, setLgas] = useState([])
   const [wards, setWards] = useState([])
 
-  const [stateId, setStateId] = useState('')
-  const [lgaId, setLgaId] = useState('')
-  const [wardId, setWardId] = useState('')
+  const [stateId, setStateId] = useState(initialValue?.stateId || '')
+  const [lgaId, setLgaId] = useState(initialValue?.lgaId || '')
+  const [wardId, setWardId] = useState(initialValue?.wardId || '')
 
   const [loadingLgas, setLoadingLgas] = useState(false)
   const [loadingWards, setLoadingWards] = useState(false)
