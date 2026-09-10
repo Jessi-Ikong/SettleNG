@@ -1,0 +1,198 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { API_BASE_URL } from '../lib/api'
+import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
+
+function formatNaira(amount) {
+  return `₦${Number(amount).toLocaleString('en-NG')}`
+}
+
+const STATUS_META = {
+  draft: { label: 'Draft', className: 'status-draft' },
+  available: { label: 'Available', className: 'status-available' },
+  pending: { label: 'Pending', className: 'status-pending' },
+  rented: { label: 'Rented', className: 'status-rented' },
+  unavailable: { label: 'Unavailable', className: 'status-unavailable' },
+  suspended: { label: 'Suspended', className: 'status-suspended' },
+}
+
+const STATUS_ACTIONS = {
+  draft: [{ label: 'Publish', next: 'available' }],
+  available: [
+    { label: 'Mark as rented', next: 'rented' },
+    { label: 'Mark unavailable', next: 'unavailable' },
+  ],
+  rented: [
+    { label: 'Mark as available', next: 'available' },
+    { label: 'Mark unavailable', next: 'unavailable' },
+  ],
+  unavailable: [{ label: 'Mark as available', next: 'available' }],
+  pending: [],
+  suspended: [],
+}
+
+export default function MyProperties() {
+  const { profile, loading: authLoading } = useAuth()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [rowErrors, setRowErrors] = useState({})
+  const [busyId, setBusyId] = useState(null)
+
+  useEffect(() => {
+    if (authLoading) return
+
+    if (!profile || !['landlord', 'agent'].includes(profile.role)) {
+      setLoading(false)
+      return
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch(`${API_BASE_URL}/api/properties?mine=true`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then((res) => res.json())
+        .then((data) => setItems(data.items))
+        .finally(() => setLoading(false))
+    })
+  }, [profile, authLoading])
+
+  const handleStatusChange = async (propertyId, nextStatus) => {
+    const previous = items
+    setRowErrors((prev) => ({ ...prev, [propertyId]: '' }))
+    setItems((prev) =>
+      prev.map((p) =>
+        p.id === propertyId ? { ...p, status: nextStatus } : p,
+      ),
+    )
+    setBusyId(propertyId)
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const res = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ status: nextStatus }),
+    })
+
+    setBusyId(null)
+
+    if (!res.ok) {
+      const body = await res.json()
+      setItems(previous)
+      setRowErrors((prev) => ({
+        ...prev,
+        [propertyId]: body.error || 'Failed to update status',
+      }))
+    }
+  }
+
+  if (authLoading || loading) {
+    return <div className="page-loading">Loading...</div>
+  }
+
+  if (!profile || !['landlord', 'agent'].includes(profile.role)) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1>Not available</h1>
+          <p>Only landlords and agents have properties to manage.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="property-list-page">
+      <h1>My properties</h1>
+
+      {items.length === 0 ? (
+        <div className="empty-state">
+          <p>You haven't listed any properties yet.</p>
+          <Link to="/create-property" className="btn-secondary">
+            List a property
+          </Link>
+        </div>
+      ) : (
+        <div className="my-properties-list">
+          {items.map((property) => {
+            const meta = STATUS_META[property.status] || {
+              label: property.status,
+              className: '',
+            }
+            const actions = STATUS_ACTIONS[property.status] || []
+
+            return (
+              <div key={property.id} className="my-property-row">
+                {property.first_image ? (
+                  <img
+                    src={property.first_image}
+                    alt={property.title}
+                    className="my-property-thumb"
+                  />
+                ) : (
+                  <div className="my-property-thumb my-property-thumb-empty">
+                    No photo
+                  </div>
+                )}
+
+                <div className="my-property-info">
+                  <Link
+                    to={`/properties/${property.id}`}
+                    className="my-property-title"
+                  >
+                    {property.title}
+                  </Link>
+                  <p className="property-card-location">
+                    {property.neighborhood.name}, {property.ward.lga.name},{' '}
+                    {property.ward.lga.state.name}
+                  </p>
+                  <p className="property-card-cost">
+                    {property.move_in_cost.total != null
+                      ? formatNaira(property.move_in_cost.total)
+                      : 'Move-in cost not provided'}
+                  </p>
+                  {rowErrors[property.id] && (
+                    <div className="form-error">{rowErrors[property.id]}</div>
+                  )}
+                </div>
+
+                <div className="my-property-controls">
+                  <span className={`status-badge ${meta.className}`}>
+                    {meta.label}
+                  </span>
+                  <div className="my-property-actions">
+                    {actions.map((action) => (
+                      <button
+                        key={action.next}
+                        type="button"
+                        className="btn-secondary"
+                        disabled={busyId === property.id}
+                        onClick={() =>
+                          handleStatusChange(property.id, action.next)
+                        }
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                    <Link
+                      to={`/edit-property/${property.id}`}
+                      className="btn-secondary"
+                    >
+                      Edit
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

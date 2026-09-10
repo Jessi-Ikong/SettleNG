@@ -8,6 +8,7 @@ import PropertyDetail from './pages/PropertyDetail'
 import PropertyList from './pages/PropertyList'
 import SavedProperties from './pages/SavedProperties'
 import SavedSearches from './pages/SavedSearches'
+import MyProperties from './pages/MyProperties'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -32,6 +33,22 @@ function App() {
           element={
             <ProtectedRoute>
               <CreateProperty />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-property/:id"
+          element={
+            <ProtectedRoute>
+              <CreateProperty />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-properties"
+          element={
+            <ProtectedRoute>
+              <MyProperties />
             </ProtectedRoute>
           }
         />

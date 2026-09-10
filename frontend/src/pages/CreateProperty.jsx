@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { API_BASE_URL } from '../lib/api'
@@ -13,6 +13,8 @@ import {
 
 export default function CreateProperty() {
   const navigate = useNavigate()
+  const { id: editPropertyId } = useParams()
+  const isEditing = Boolean(editPropertyId)
   const { profile, loading } = useAuth()
 
   const [title, setTitle] = useState('')
@@ -43,7 +45,59 @@ export default function CreateProperty() {
   const [previews, setPreviews] = useState([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [loadingExisting, setLoadingExisting] = useState(isEditing)
+  const [notOwner, setNotOwner] = useState(false)
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    if (!isEditing || !profile) return
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch(`${API_BASE_URL}/api/properties/${editPropertyId}`, {
+        headers: session
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            setNotOwner(true)
+            return
+          }
+          const property = await res.json()
+
+          if (property.owner_id !== profile.id) {
+            setNotOwner(true)
+            return
+          }
+
+          setTitle(property.title || '')
+          setDescription(property.description || '')
+          setPropertyType(property.property_type || '')
+          setBedrooms(property.bedrooms ?? '')
+          setBathrooms(property.bathrooms ?? '')
+          setToilets(property.toilets ?? '')
+          setFurnished(property.furnished || '')
+          setAmenities(property.amenities || [])
+          setLocation({
+            stateId: String(property.ward.lga.state.id),
+            lgaId: String(property.ward.lga.id),
+            wardId: String(property.ward.id),
+          })
+          setNeighborhoodName(property.neighborhood.name || '')
+          setStreet(property.street || '')
+          setPrices({
+            rent_amount: property.rent_amount ?? '',
+            agency_fee: property.agency_fee ?? '',
+            agreement_fee: property.agreement_fee ?? '',
+            caution_fee: property.caution_fee ?? '',
+            service_charge: property.service_charge ?? '',
+            other_fee: property.other_fee ?? '',
+          })
+        })
+        .catch(() => setNotOwner(true))
+        .finally(() => setLoadingExisting(false))
+    })
+  }, [isEditing, editPropertyId, profile])
 
   useEffect(() => {
     if (!location.wardId) {
@@ -56,7 +110,7 @@ export default function CreateProperty() {
       .catch(() => setNeighborhoods([]))
   }, [location.wardId])
 
-  if (loading) {
+  if (loading || loadingExisting) {
     return <div className="page-loading">Loading...</div>
   }
 
@@ -66,6 +120,17 @@ export default function CreateProperty() {
         <div className="auth-card">
           <h1>Not available</h1>
           <p>Only landlords and agents can list a property.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (notOwner) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1>Not available</h1>
+          <p>You can only edit your own properties.</p>
         </div>
       </div>
     )
@@ -125,31 +190,34 @@ export default function CreateProperty() {
       ),
     }
 
-    const createRes = await fetch(`${API_BASE_URL}/api/properties`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+    const saveRes = await fetch(
+      `${API_BASE_URL}/api/properties${isEditing ? `/${editPropertyId}` : ''}`,
+      {
+        method: isEditing ? 'PATCH' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(payload),
       },
-      body: JSON.stringify(payload),
-    })
+    )
 
-    const created = await createRes.json()
+    const saved = await saveRes.json()
 
-    if (!createRes.ok) {
+    if (!saveRes.ok) {
       setSubmitting(false)
-      setError(created.error || 'Failed to create property')
+      setError(saved.error || `Failed to ${isEditing ? 'save' : 'create'} property`)
       return
     }
 
-    if (files.length > 0) {
+    if (!isEditing && files.length > 0) {
       const formData = new FormData()
       for (const file of files) {
         formData.append('images', file)
       }
 
       const imagesRes = await fetch(
-        `${API_BASE_URL}/api/properties/${created.id}/images`,
+        `${API_BASE_URL}/api/properties/${saved.id}/images`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -167,13 +235,13 @@ export default function CreateProperty() {
       }
     }
 
-    navigate(`/properties/${created.id}`)
+    navigate(`/properties/${saved.id}`)
   }
 
   return (
     <div className="create-property-page">
       <div className="create-property-card">
-        <h1>List a property</h1>
+        <h1>{isEditing ? 'Edit property' : 'List a property'}</h1>
 
         {error && <div className="form-error">{error}</div>}
 
@@ -283,7 +351,7 @@ export default function CreateProperty() {
 
           <div className="form-field">
             <span>Location</span>
-            <LocationPicker onChange={setLocation} />
+            <LocationPicker onChange={setLocation} initialValue={location} />
           </div>
 
           <div className="form-field">
@@ -337,27 +405,40 @@ export default function CreateProperty() {
             </div>
           </div>
 
-          <div className="form-field">
-            <label htmlFor="images">Photos</label>
-            <input
-              id="images"
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileChange}
-            />
-            {previews.length > 0 && (
-              <div className="image-preview-grid">
-                {previews.map((src, i) => (
-                  <img key={i} src={src} alt="" className="image-preview" />
-                ))}
-              </div>
-            )}
-          </div>
+          {!isEditing && (
+            <div className="form-field">
+              <label htmlFor="images">Photos</label>
+              <input
+                id="images"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileChange}
+              />
+              {previews.length > 0 && (
+                <div className="image-preview-grid">
+                  {previews.map((src, i) => (
+                    <img key={i} src={src} alt="" className="image-preview" />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {isEditing && (
+            <p className="owner-actions-hint">
+              Photos aren't editable here yet — existing photos are kept as-is.
+            </p>
+          )}
 
           <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? 'Creating...' : 'Create listing'}
+            {submitting
+              ? isEditing
+                ? 'Saving...'
+                : 'Creating...'
+              : isEditing
+                ? 'Save changes'
+                : 'Create listing'}
           </button>
         </form>
       </div>

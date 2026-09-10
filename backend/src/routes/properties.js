@@ -360,6 +360,45 @@ router.get('/', async (req, res) => {
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
+  if (String(q.mine) === 'true') {
+    const authHeader = req.headers.authorization || ''
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    const token = authHeader.slice('Bearer '.length)
+    const { data: authData, error: authError } =
+      await supabase.auth.getUser(token)
+
+    if (authError || !authData?.user) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    // "My properties" ignores every Phase 4 search filter/sort — it's
+    // an owner's own inventory, not a public search.
+    const {
+      data,
+      error,
+      count,
+    } = await supabase
+      .from('properties')
+      .select(PROPERTY_CARD_SELECT, { count: 'exact' })
+      .eq('owner_id', authData.user.id)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    return res.json({
+      items: data.map(toPropertyCard),
+      page,
+      pageSize,
+      total: count,
+      totalPages: Math.ceil((count ?? 0) / pageSize),
+    })
+  }
+
   const locationFilter = await resolveLocationFilter(q)
 
   // A resolved-but-empty ward list (e.g. a state/lga with no wards)
