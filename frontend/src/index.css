@@ -174,3 +174,60 @@ a {
   color: var(--color-ink);
   margin: 0;
 }
+
+.location-picker {
+  display: inline-block;
+}
+
+.signpost-trail {
+  display: flex;
+  align-items: stretch;
+}
+
+.signpost-chip {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #fff;
+  background: var(--color-indigo);
+  border: none;
+  outline: none;
+  padding: 10px 28px 10px 22px;
+  cursor: pointer;
+  clip-path: polygon(
+    0% 0%,
+    calc(100% - 16px) 0%,
+    100% 50%,
+    calc(100% - 16px) 100%,
+    0% 100%,
+    16px 50%
+  );
+}
+
+.signpost-chip:first-child {
+  padding-left: 16px;
+  clip-path: polygon(
+    0% 0%,
+    calc(100% - 16px) 0%,
+    100% 50%,
+    calc(100% - 16px) 100%,
+    0% 100%
+  );
+}
+
+.signpost-chip:not(:first-child) {
+  margin-left: -14px;
+}
+
+.signpost-chip:disabled {
+  background: rgba(23, 48, 74, 0.45);
+  color: rgba(255, 255, 255, 0.75);
+  cursor: not-allowed;
+}
+
+.signpost-chip:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: -3px;
+}

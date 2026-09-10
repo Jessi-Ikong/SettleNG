@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import LocationPicker from '../components/LocationPicker'
 
 export default function Landing() {
   return (
@@ -11,6 +12,12 @@ export default function Landing() {
       <div className="auth-switch">
         <Link to="/login">Log in</Link> · <Link to="/register">Register</Link>
       </div>
+
+      {/* Temporary: LocationPicker isn't wired into search/property
+          creation yet, so it's previewed here until Phase 3. */}
+      <LocationPicker
+        onChange={(selection) => console.log('LocationPicker:', selection)}
+      />
     </main>
   )
 }

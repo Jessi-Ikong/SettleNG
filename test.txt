@@ -192,3 +192,42 @@ How to test this yourself:
 4. GET http://localhost:5050/api/me with no token → 401 {"error":"Unauthorized"}. With a valid token (grab access_token from DevTools localStorage key sb-<project-ref>-auth-token while logged in, or from the network response of the login call) → 200 with the matching user_id/full_name/role/phone
 
 Notes: Two follow-up items for the product owner to decide on, not blockers: (1) "Confirm email" is currently OFF for ease of local testing — decide when to turn it back on for production, and note Register.jsx doesn't yet show a "check your email" message if it's re-enabled, so that'd need a small addition first. (2) Supabase's default/shared mailer has a very low rate limit (we hit "email rate limit exceeded" during testing after a handful of signups) — if email confirmation is re-enabled, a custom SMTP provider should be configured in Supabase before real users start signing up.
+
+---
+Date: 2026-09-10
+Feature/Task: Nigeria location hierarchy — states/LGAs/wards, seed script, read-only API, LocationPicker
+Files changed:
+- backend/sql/003_locations.sql (new — states/lgas/wards tables, indexes, RLS with public-read policies. Named 003 not 002 since 002_fix_trigger.sql already existed from the auth phase; run by the product owner directly in the Supabase SQL editor)
+- backend/scripts/seedLocations.js (new — fetches the dataset, batch-inserts states→lgas→wards, activates Lagos, refuses to reseed if states already has rows)
+- backend/src/routes/locations.js (new — GET /api/locations/states, /states/:stateId/lgas, /lgas/:lgaId/wards)
+- backend/src/index.js (edited — wired /api/locations)
+- frontend/src/lib/api.js (new — API_BASE_URL from VITE_API_URL, defaults to http://localhost:5050; first frontend code that calls our own backend rather than Supabase directly)
+- frontend/.env.example, frontend/.env (edited — added VITE_API_URL)
+- frontend/src/components/LocationPicker.jsx (new — chained State→LGA→Ward selects, signpost-trail chip styling, exposes {stateId,lgaId,wardId} via onChange)
+- frontend/src/index.css (edited — added .location-picker/.signpost-trail/.signpost-chip styles: chevron-shaped chips in indigo, chained with overlapping notches, disabled state for LGA/Ward before their parent is picked)
+- frontend/src/pages/Landing.jsx (edited — temporarily renders LocationPicker so it's visible/testable; not wired into a real page yet since search/property creation don't exist)
+
+What was tested (by Claude Code):
+- IMPORTANT: the dataset URL in the spec (.../main/full.json) 404s — the actual file lives at .../main/data/full.json (verified via the GitHub contents API: root has no full.json, only a data/ folder containing full.json, lgas-with-wards.json, lgas.json, states.json, wards.json). Used the corrected data/full.json URL in the seed script and documented the discrepancy in a code comment.
+- Downloaded and inspected the real dataset before writing any insert logic per your instruction — confirmed shape matches assumption: array of {state, lgas:[{name, wards:[{name,latitude,longitude}]}]}. Counted 37 states, 774 LGAs, 8809 wards, zero missing names/coordinates, zero duplicate state names, zero duplicate LGA names within a state (safe to key LGA lookups by state_id+name), but did find 11 duplicate ward names within the same LGA (harmless — no uniqueness constraint on ward names, they're just inserted as-is)
+- Ran the seed script for real against the now-migrated Supabase project: succeeded on the first run, logged "Inserted 37 states", "Inserted 774 LGAs", "Inserted 8809 wards", "Marked Lagos as active", "Seeding complete."
+- Ran it a second time to confirm the idempotency guard — correctly exited with "states table already has 37 row(s) — refusing to reseed" and did not insert anything
+- Verified via the Supabase REST API directly (service role key): Lagos row has active:true, and a count query on wards confirms exactly 8809 rows
+- Restarted the backend and curled all three endpoints: GET /api/locations/states (37 results, alphabetical, Lagos id=25), GET /api/locations/states/25/lgas (20 Lagos LGAs, alphabetical), GET /api/locations/lgas/506/wards (11 Agege wards with lat/lng). Also tested both 404 paths: a nonexistent numeric id (99999) and a non-numeric id ("abc") both correctly return 404 with a clear JSON error, not an empty 200
+- Drove the actual LocationPicker in the browser (not just curl): confirmed the State dropdown shows ONLY Lagos (the one active state — Abia etc. correctly excluded), selecting Lagos populates all 20 LGAs and enables that dropdown, selecting Ikeja populates its 10 real wards and enables the Ward dropdown. Visually confirmed the chevron/signpost chip styling renders correctly (indigo, chained, disabled state greyed out until its parent is chosen)
+
+Expected result:
+- Seed script populates the DB correctly and is safe to re-run; all three endpoints return correct, correctly-ordered data and clean 404s; LocationPicker chains correctly and only offers active states
+
+Actual result:
+- Matches expected exactly
+
+Status: PASS
+
+How to test this yourself:
+1. Run the seed script: `node backend/scripts/seedLocations.js` (needs backend/.env's SUPABASE_URL/SUPABASE_SERVICE_KEY, and 003_locations.sql must already be run). Expect to see: a "Fetching dataset..." line, a "Sample of the first state entry" JSON block, then "Inserted 37 states", "Inserted 774 LGAs", "Inserted 8809 wards", "Marked Lagos as active", "Seeding complete." Running it again should print "states table already has 37 row(s) — refusing to reseed" and exit without inserting anything.
+2. Confirm row counts in Supabase Table Editor: states should show 37 rows (Lagos with active=true, everything else false), lgas should show 774 rows, wards should show 8809 rows.
+3. Test the API directly (backend running on port 5050): `curl http://localhost:5050/api/locations/states` (expect 37 states, alphabetical, Lagos id 25). `curl http://localhost:5050/api/locations/states/25/lgas` (expect Lagos's 20 LGAs, alphabetical, starting with Agege id 506). `curl http://localhost:5050/api/locations/lgas/506/wards` (expect Agege's 11 wards with lat/lng). `curl -i http://localhost:5050/api/locations/states/99999/lgas` (expect 404 {"error":"State 99999 not found"}).
+4. See LocationPicker working: open http://localhost:5173/ (the landing page) — the three chained chips are visible right below the Log in/Register links. Pick "Lagos" (the only option, since it's the only active state), then pick any LGA, then any ward. Open the browser console to see each selection logged as {stateId, lgaId, wardId}. This is a temporary placement — remove it from Landing.jsx once LocationPicker gets wired into real search/property-creation pages in a later phase.
+
+Notes: Flag the dataset URL correction (data/full.json, not full.json at repo root) to whoever wrote the original spec, in case other tooling/docs reference the same wrong path. Neighborhoods and streets are intentionally not part of this schema yet, per your instructions — they'll be agent/landlord-submitted free text in the properties phase, not seeded reference data.
