@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
+import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
+import { fetchFavoritedIds } from '../lib/favoritesApi'
 import SearchFilters from '../components/SearchFilters'
+import FavoriteButton from '../components/FavoriteButton'
 
 function formatNaira(amount) {
   return `₦${Number(amount).toLocaleString('en-NG')}`
@@ -38,10 +42,16 @@ function paramsToFilters(searchParams) {
 }
 
 export default function PropertyList() {
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [result, setResult] = useState({ items: [], total: 0, totalPages: 1 })
   const [loading, setLoading] = useState(true)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [favoritedIds, setFavoritedIds] = useState(new Set())
+  const [showSaveSearch, setShowSaveSearch] = useState(false)
+  const [saveSearchName, setSaveSearchName] = useState('')
+  const [savingSearch, setSavingSearch] = useState(false)
+  const [saveSearchMessage, setSaveSearchMessage] = useState('')
 
   const filters = paramsToFilters(searchParams)
   const sort = searchParams.get('sort') || 'newest'
@@ -62,6 +72,14 @@ export default function PropertyList() {
       .then((data) => setResult(data))
       .finally(() => setLoading(false))
   }, [searchParams])
+
+  useEffect(() => {
+    if (!user) {
+      setFavoritedIds(new Set())
+      return
+    }
+    fetchFavoritedIds().then(setFavoritedIds)
+  }, [user])
 
   const updateParams = (partial, { resetPage = true } = {}) => {
     const next = new URLSearchParams(searchParams)
@@ -87,6 +105,39 @@ export default function PropertyList() {
     const next = new URLSearchParams()
     if (sort !== 'newest') next.set('sort', sort)
     setSearchParams(next)
+  }
+
+  const handleSaveSearch = async () => {
+    if (!saveSearchName.trim()) return
+    setSavingSearch(true)
+    setSaveSearchMessage('')
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const filtersToSave = Object.fromEntries(searchParams.entries())
+
+    const res = await fetch(`${API_BASE_URL}/api/saved-searches`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ name: saveSearchName.trim(), filters: filtersToSave }),
+    })
+
+    setSavingSearch(false)
+
+    if (!res.ok) {
+      setSaveSearchMessage('Failed to save search')
+      return
+    }
+
+    setSaveSearchName('')
+    setShowSaveSearch(false)
+    setSaveSearchMessage('Search saved')
+    setTimeout(() => setSaveSearchMessage(''), 3000)
   }
 
   const hasActiveFilters = FILTER_KEYS.some((key) => searchParams.get(key))
@@ -120,21 +171,66 @@ export default function PropertyList() {
                 ? 'Loading...'
                 : `${result.total} propert${result.total === 1 ? 'y' : 'ies'} found`}
             </span>
-            <label className="sort-select">
-              Sort by{' '}
-              <select
-                value={sort}
-                onChange={(e) =>
-                  updateParams({ sort: e.target.value }, { resetPage: true })
-                }
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+
+            <div className="toolbar-right">
+              {user && (
+                <div className="save-search">
+                  {showSaveSearch ? (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Search name"
+                        value={saveSearchName}
+                        onChange={(e) => setSaveSearchName(e.target.value)}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={handleSaveSearch}
+                        disabled={savingSearch}
+                      >
+                        {savingSearch ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => setShowSaveSearch(false)}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setShowSaveSearch(true)}
+                    >
+                      Save this search
+                    </button>
+                  )}
+                  {saveSearchMessage && (
+                    <span className="save-search-message">{saveSearchMessage}</span>
+                  )}
+                </div>
+              )}
+
+              <label className="sort-select">
+                Sort by{' '}
+                <select
+                  value={sort}
+                  onChange={(e) =>
+                    updateParams({ sort: e.target.value }, { resetPage: true })
+                  }
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
 
           {loading ? (
@@ -160,17 +256,23 @@ export default function PropertyList() {
                   to={`/properties/${property.id}`}
                   className="property-card"
                 >
-                  {property.first_image ? (
-                    <img
-                      src={property.first_image}
-                      alt={property.title}
-                      className="property-card-image"
+                  <div className="property-card-media">
+                    {property.first_image ? (
+                      <img
+                        src={property.first_image}
+                        alt={property.title}
+                        className="property-card-image"
+                      />
+                    ) : (
+                      <div className="property-card-image property-card-image-empty">
+                        No photo
+                      </div>
+                    )}
+                    <FavoriteButton
+                      propertyId={property.id}
+                      initialFavorited={favoritedIds.has(property.id)}
                     />
-                  ) : (
-                    <div className="property-card-image property-card-image-empty">
-                      No photo
-                    </div>
-                  )}
+                  </div>
                   <div className="property-card-body">
                     <span className="badge-available">{property.status}</span>
                     <h3>{property.title}</h3>

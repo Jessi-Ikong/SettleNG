@@ -3,18 +3,16 @@ import { Router } from 'express'
 import multer from 'multer'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import {
+  PRICING_FIELDS,
+  LOCATION_JOIN,
+  PROPERTY_CARD_SELECT,
+  computeMoveInCost,
+  toPropertyCard,
+} from '../lib/propertyShape.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
-
-const PRICING_FIELDS = [
-  'rent_amount',
-  'agency_fee',
-  'agreement_fee',
-  'caution_fee',
-  'service_charge',
-  'other_fee',
-]
 
 const EDITABLE_FIELDS = [
   'title',
@@ -42,24 +40,6 @@ function toNullableNumber(value) {
 function toNullableInt(value) {
   const num = toNullableNumber(value)
   return num === null ? null : Math.trunc(num)
-}
-
-function computeMoveInCost(property) {
-  let total = 0
-  let anyProvided = false
-  const notProvided = []
-
-  for (const field of PRICING_FIELDS) {
-    const value = property[field]
-    if (value === null || value === undefined) {
-      notProvided.push(field)
-    } else {
-      total += Number(value)
-      anyProvided = true
-    }
-  }
-
-  return { total: anyProvided ? total : null, notProvided }
 }
 
 async function findOrCreateNeighborhood(wardId, name, createdBy) {
@@ -123,9 +103,6 @@ function buildPropertyPayload(body) {
 
   return payload
 }
-
-const LOCATION_JOIN =
-  'ward:ward_id(id,name,lga:lga_id(id,name,state:state_id(id,name))),neighborhood:neighborhood_id(id,name)'
 
 const PROPERTY_TYPE_VALUES = [
   'self_contained',
@@ -394,13 +371,7 @@ router.get('/', async (req, res) => {
 
   let query = supabase
     .from('properties')
-    .select(
-      `id, title, property_type, bedrooms, bathrooms, status, created_at,
-       rent_amount, agency_fee, agreement_fee, caution_fee, service_charge, other_fee,
-       ${LOCATION_JOIN},
-       property_images(url, sort_order)`,
-      { count: 'exact' },
-    )
+    .select(PROPERTY_CARD_SELECT, { count: 'exact' })
     .eq('status', 'available')
 
   if (locationFilter.type === 'neighborhood') {
@@ -464,17 +435,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({ error: error.message })
   }
 
-  const items = data.map((property) => {
-    const images = [...(property.property_images || [])].sort(
-      (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
-    )
-    const { property_images, ...rest } = property
-    return {
-      ...rest,
-      first_image: images[0]?.url ?? null,
-      move_in_cost: computeMoveInCost(property),
-    }
-  })
+  const items = data.map(toPropertyCard)
 
   res.json({
     items,

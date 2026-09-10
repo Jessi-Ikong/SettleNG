@@ -4,6 +4,8 @@ import cors from 'cors'
 import meRouter from './routes/me.js'
 import locationsRouter from './routes/locations.js'
 import propertiesRouter from './routes/properties.js'
+import favoritesRouter from './routes/favorites.js'
+import savedSearchesRouter from './routes/savedSearches.js'
 
 const app = express()
 const PORT = process.env.PORT || 5050
@@ -18,6 +20,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/me', meRouter)
 app.use('/api/locations', locationsRouter)
 app.use('/api/properties', propertiesRouter)
+app.use('/api/favorites', favoritesRouter)
+app.use('/api/saved-searches', savedSearchesRouter)
 
 app.listen(PORT, () => {
   console.log(`SettleNG API listening on port ${PORT}`)

@@ -14,6 +14,8 @@ export default function Nav() {
       <div className="site-nav-links">
         <Link to="/properties">Browse</Link>
         {canList && <Link to="/create-property">List a property</Link>}
+        {user && <Link to="/saved-properties">Saved Properties</Link>}
+        {user && <Link to="/saved-searches">Saved Searches</Link>}
         {user ? (
           <Link to="/dashboard">Dashboard</Link>
         ) : (

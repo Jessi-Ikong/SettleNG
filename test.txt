@@ -358,4 +358,53 @@ How to test this yourself:
 4. Null-sort confirmation: visit http://localhost:5173/properties?sort=price_low and scroll to the bottom of the results — the property with no rent set ("UI Image Upload Test", or whichever test property has blank pricing) should be last, never first. Repeat with sort=price_high — it should still be last, not first (a naive "nulls sort as zero" implementation would incorrectly put it first here).
 
 Notes: min_price/max_price filter on rent_amount only (not total move-in cost), per your instruction, since total cost has too many nulls to filter on reliably — worth surfacing that distinction in the UI copy if users seem confused (I labeled the inputs "Rent (₦)" with "Min rent"/"Max rent" placeholders for this reason). The neighborhood filter dropdown only populates once a ward is selected, matching how neighborhoods are scoped in the schema (they belong to a ward, not directly to an LGA/state).
+
+---
+Date: 2026-09-10
+Feature/Task: Favorites & saved searches
+Files changed:
+- backend/sql/005_saved.sql (new — favorites/saved_searches tables, indexes, RLS "own rows only" policies, run by product owner)
+- backend/src/lib/propertyShape.js (new — extracted PRICING_FIELDS/LOCATION_JOIN/PROPERTY_CARD_SELECT/computeMoveInCost/toPropertyCard out of properties.js so favorites.js can produce the exact same card shape without duplicating/drifting from the properties-list logic)
+- backend/src/routes/properties.js (refactored — now imports the shared shape helpers instead of defining its own copies; GET / and GET /:id behavior unchanged, verified by re-running the Phase 4 curl tests)
+- backend/src/routes/favorites.js (new — POST/DELETE/GET /api/favorites, all protected, idempotent add/remove, GET returns favorited properties in the same card shape as GET /api/properties, including non-available ones with their real status so the frontend can flag them)
+- backend/src/routes/savedSearches.js (new — POST/GET/DELETE /api/saved-searches, all protected, ownership-checked delete)
+- backend/src/index.js (edited — wired /api/favorites and /api/saved-searches)
+- frontend/src/lib/favoritesApi.js (new — fetchFavoritedIds(), returns a Set of the logged-in user's favorited property ids, empty Set if logged out)
+- frontend/src/components/FavoriteButton.jsx (new — heart icon, optimistic toggle with revert-on-failure, redirects to /login instead of calling the API when logged out)
+- frontend/src/pages/PropertyList.jsx (edited — FavoriteButton on every card via a new .property-card-media wrapper; "Save this search" inline-prompt button, visible only when logged in, posts the current URL's query params as-is)
+- frontend/src/pages/PropertyDetail.jsx (edited — FavoriteButton in the header row, initial state resolved via fetchFavoritedIds())
+- frontend/src/pages/SavedProperties.jsx (new — protected, grid of favorited properties reusing the same card markup/styles as Browse; unavailable ones show a "No longer available" badge and a muted card instead of disappearing; un-favoriting removes the card immediately via FavoriteButton's onToggle)
+- frontend/src/pages/SavedSearches.jsx (new — protected, lists saved searches by name/date, each links to /properties with its stored filters reapplied, delete button per row)
+- frontend/src/components/Nav.jsx (edited — added Saved Properties/Saved Searches links, visible to any logged-in user regardless of role, per your instruction that a landlord might want to save a competitor's listing)
+- frontend/src/App.jsx (edited — added /saved-properties and /saved-searches protected routes)
+- frontend/src/index.css (edited — favorite button styles including active/filled state, property-card-media positioning, badge-unavailable, property-card-muted, save-search inline prompt styles, saved-search-list styles)
+
+What was tested (by Claude Code):
+- Refactor safety check first: re-ran the Phase 4 filter/sort curl tests against the refactored properties.js (state_id, bedrooms, price range, amenities AND-match, null-safe sort) — all still passed identically, confirming the shared-module extraction didn't change existing behavior.
+- Backend, via curl with two real accounts (a landlord and a tenant): POST /api/favorites → 201 the first time, 200 (not an error) on an identical second POST — confirmed idempotent. DELETE /api/favorites/:id → 200, and 200 again on a second DELETE of the same (already-gone) favorite — confirmed idempotent both directions.
+- GET /api/favorites returned the favorited property in the exact same shape as GET /api/properties (location joins, first_image, move_in_cost).
+- The "no longer available" case, backend-first: favorited a property as the tenant, then as its actual owner (a separate account) soft-deleted it via DELETE /api/properties/:id (status → unavailable) — confirmed the tenant's GET /api/favorites still returned it with status:"unavailable", while GET /api/properties (public browse) correctly no longer included it.
+- POST /api/favorites with no Authorization header → 401, confirmed the route requires auth.
+- Saved searches: POST with a name + a realistic filters object → 201 with the filters stored verbatim (not re-shaped). A second account attempting to DELETE the first account's saved search → 403 "You do not own this saved search"; the owning account's own DELETE → 200, confirmed gone on a follow-up GET.
+- Full browser-driven test end to end: confirmed clicking a heart while logged out (verified by actually clearing the session and reloading, not just assuming) redirects to /login with no error and no network call. Logged in as the tenant, favorited one property from the Browse grid and a second from its own detail page — confirmed via direct DOM inspection that both hearts filled immediately (optimistic UI) and neither click triggered navigation through the surrounding card link. Visited /saved-properties and confirmed both appeared. Clicked "Remove from favorites" directly on that page — confirmed the card disappeared immediately AND confirmed via a direct API call that it was actually gone server-side, not just hidden client-side.
+- Re-tested the "no longer available" case through the full UI this time: with a property already favorited, changed its status to "rented" as its real owner account, reloaded the tenant's /saved-properties, and confirmed it was still there with a "No longer available" badge and a visually muted card (.property-card-muted), never silently dropped. Restored the property to available afterward.
+- "Save this search": applied state_id + bedrooms filters on Browse, clicked "Save this search", typed a name, saved — confirmed via a direct API call that it was persisted with the exact filters object from the URL. Visited /saved-searches, confirmed it listed with the correct name and a formatted date. Clicked it — confirmed it navigated to /properties with the exact same query params restored and reproduced the exact same single-result set as the original search. Clicked Delete — confirmed it disappeared from the page immediately, the empty state rendered correctly, and confirmed via a direct API call it was actually deleted, not just hidden.
+
+Expected result:
+- Idempotent favorite/un-favorite; favorites list uses the identical card shape as the main browse list; non-available favorited properties are flagged, never hidden; logged-out heart click redirects cleanly; saved searches round-trip exactly through save → list → re-run → delete
+
+Actual result:
+- Matches expected exactly
+
+Status: PASS
+
+How to test this yourself:
+1. Favorite from both places: log in, go to /properties, click the heart on any card — it should fill in (turn brass/gold) immediately. Open a different property's own detail page and click its heart there too. Visit /saved-properties and confirm both properties you just favorited are listed.
+2. Un-favorite from /saved-properties itself: click the filled heart on one of the cards there — confirm it disappears from the page right away (not just visually — refresh the page to double check it's really gone, not cached).
+3. Log out (or open an incognito window), go to /properties, and click any heart icon — confirm you're redirected straight to /login with no error message or broken state.
+4. Save a search: on /properties, apply 2-3 filters (e.g. pick a state, set a bedroom count, maybe a max rent), click "Save this search" near the sort dropdown, type a name, and click Save. Go to /saved-searches — confirm it's listed with that name and today's date. Click it — confirm the URL changes to include the exact same filters and the results grid shows the exact same properties as when you originally applied them.
+5. Delete that saved search from /saved-searches using its Delete button — confirm it disappears from the list immediately, and if it was your only one, confirm the "You haven't saved any searches yet" empty state appears.
+6. "No longer available" test: as one account, favorite a property. Then, logged in as that property's actual owner (a different account, or a different browser/incognito session), open its detail page and use the "Publish listing" flow in reverse — actually, to change status away from available you currently need the API directly: `curl -X PATCH http://localhost:5050/api/properties/<id> -H "Authorization: Bearer <owner's token>" -H "Content-Type: application/json" -d "{\"status\":\"rented\"}"`. Then, back on the favoriting account's /saved-properties page, refresh — confirm the property is STILL there (not silently removed), now showing a "No longer available" badge instead of the normal green availability badge, and visually muted/dimmed compared to the other cards.
+
+Notes: There's still no frontend UI for a landlord to change a property's status to anything other than draft→available (no "mark as rented" button exists yet) — step 6 above has to go through the API directly for now, same limitation noted in the Phase 3 entry for the Publish button before it existed. Left one real favorite (tenant account settleng.debug.qa3@gmail.com favorited "Virgin 2 bedroom self-contained apartment") and no saved searches (the one created during testing was deleted as part of the test itself) in the database from this session.
     

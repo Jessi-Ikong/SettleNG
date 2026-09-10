@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { fetchFavoritedIds } from '../lib/favoritesApi'
+import FavoriteButton from '../components/FavoriteButton'
 import { PRICING_FIELDS, PROPERTY_TYPES } from '../lib/amenities'
 
 function formatNaira(amount) {
@@ -11,12 +13,13 @@ function formatNaira(amount) {
 
 export default function PropertyDetail() {
   const { id } = useParams()
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
   const [property, setProperty] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
+  const [isFavorited, setIsFavorited] = useState(false)
 
   const loadProperty = async () => {
     const {
@@ -44,6 +47,14 @@ export default function PropertyDetail() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    if (!user) {
+      setIsFavorited(false)
+      return
+    }
+    fetchFavoritedIds().then((ids) => setIsFavorited(ids.has(id)))
+  }, [id, user])
 
   const handlePublish = async () => {
     setPublishing(true)
@@ -115,6 +126,10 @@ export default function PropertyDetail() {
           {property.status !== 'available' && (
             <span className="badge-draft">{property.status}</span>
           )}
+          <FavoriteButton
+            propertyId={property.id}
+            initialFavorited={isFavorited}
+          />
         </div>
 
         <p className="property-type-label">{typeLabel}</p>
