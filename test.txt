@@ -1,0 +1,194 @@
+SETTLENG — TEST LOG
+====================
+
+Claude Code: add one entry per completed task, in this format, appended
+to the bottom of this file (don't rewrite earlier entries).
+
+---
+Date: YYYY-MM-DD
+Feature/Task: <short name, matches the prompt you were given>
+Files changed: <list>
+
+What was tested (by Claude Code):
+- <step 1>
+- <step 2>
+
+Expected result:
+- <what should happen>
+
+Actual result:
+- <what happened>
+
+Status: PASS / FAIL / PARTIAL
+
+How to test this yourself:
+1. <exact command to run, e.g. "npm run dev in /backend">
+2. <exact URL/screen to open, e.g. "http://localhost:5050/api/properties">
+3. <exact action to take, e.g. "submit the form with these sample values: ...">
+4. <what you should see if it worked>
+5. <what would indicate it's broken>
+
+Notes: <anything the product owner or Claude should know — edge cases
+skipped, known issues, follow-up needed>
+---
+
+(entries begin below this line)
+
+---
+Date: 2026-09-10
+Feature/Task: Initial repo structure (frontend + backend scaffold)
+Files changed:
+- .gitignore (new)
+- frontend/ (new — Vite React scaffold, react-router-dom, @supabase/supabase-js)
+- frontend/.env.example (new)
+- frontend/src/lib/supabaseClient.js (new)
+- frontend/src/App.jsx, frontend/src/App.css, frontend/src/index.css (rewritten — SettleNG placeholder screen + design tokens)
+- frontend/index.html (edited — Google Fonts, page title)
+- backend/ (new — Express API, cors, dotenv, @supabase/supabase-js)
+- backend/package.json ("type": "module", start script)
+- backend/.env.example (new)
+- backend/src/index.js (new — GET /api/health)
+- README.md (renamed from "README (1).md", content unchanged)
+
+What was tested (by Claude Code):
+- Ran `npm create vite@latest frontend -- --template react` then `npm install` in /frontend
+- Installed react-router-dom and @supabase/supabase-js in /frontend
+- Started `npm run dev` in /frontend and curled the served page — confirmed HTML loads, title is "SettleNG", Google Fonts links present, App.jsx compiles and serves the wordmark/tagline markup
+- Ran `npm init -y` in /backend, set "type": "module", installed express/cors/dotenv/@supabase/supabase-js
+- Started `node src/index.js` in /backend and curled http://localhost:5050/api/health — confirmed JSON response and console log of the port
+- Ran `git init` at repo root, added .gitignore, and ran `git add -A --dry-run` to confirm node_modules/ and .env files are excluded from tracking in both /frontend and /backend
+
+Expected result:
+- Frontend dev server boots without errors and renders "Settle" (indigo) + "NG" (brass) wordmark in Archivo, with the tagline in Work Sans below it, on the --color-bg background
+- Backend starts on port 5050 (not 3000/5000/8000) and GET /api/health returns { status: "ok", service: "SettleNG API" }
+- git status shows no node_modules or .env files as trackable
+
+Actual result:
+- Frontend dev server booted (port 5173 was busy so Vite auto-selected 5174 — this is normal Vite behavior, not an error); page HTML and compiled App.jsx confirmed via curl
+- Backend printed "SettleNG API listening on port 5050" and curl to /api/health returned {"status":"ok","service":"SettleNG API"}
+- git add -A --dry-run listed only source files, package.json/package-lock.json, and .env.example files — no node_modules or .env
+
+Status: PASS
+
+How to test this yourself:
+1. In /frontend: copy .env.example to .env and fill in your Supabase URL/anon key (optional for viewing the placeholder screen), then run `npm install` (if not already run) and `npm run dev`
+2. Open the URL Vite prints (usually http://localhost:5173, or the next free port if that one's taken)
+3. You should see the "Settle" (indigo) + "NG" (brass) wordmark in bold Archivo, centered, with "Find a place, verified before you move." in Work Sans underneath, on the SettleNG background color
+4. In a separate terminal, in /backend: copy .env.example to .env (PORT=5050 works out of the box even without Supabase keys), run `npm install` (if not already run), then `node src/index.js` (or `npm start`)
+5. Visit http://localhost:5050/api/health in a browser — you should see {"status":"ok","service":"SettleNG API"}, and the terminal should print "SettleNG API listening on port 5050"
+6. If either step shows a blank page, a port-in-use crash, or a JSON error instead of the health payload, something is broken
+
+Notes: Supabase project isn't created yet, so supabaseClient.js and the backend's Supabase env vars are wired up but unverified against a real Supabase instance — that's expected until Phase 1 (Auth) needs it. The original README.md file was found saved as "README (1).md" (likely a browser download artifact) and was renamed to README.md with no content changes before this task began.
+
+---
+Date: 2026-09-10
+Feature/Task: Auth & role assignment (registration, login, protected dashboard, /api/me)
+Files changed:
+- backend/sql/001_profiles.sql (new — exact SQL to run in Supabase SQL editor)
+- backend/src/lib/supabaseClient.js (new — service-role Supabase client for backend)
+- backend/src/middleware/auth.js (new — requireAuth, verifies Bearer token + attaches req.user/req.profile)
+- backend/src/routes/me.js (new — GET /api/me, protected)
+- backend/src/index.js (edited — wired /api/me route)
+- frontend/src/context/AuthContext.jsx (new — session + profile tracking via onAuthStateChange)
+- frontend/src/components/ProtectedRoute.jsx (new — redirects to /login if no session, shows loading state)
+- frontend/src/pages/Landing.jsx (new — placeholder home with links to /login, /register)
+- frontend/src/pages/Register.jsx (new — full name/email/password/phone/role form)
+- frontend/src/pages/Login.jsx (new — email/password form)
+- frontend/src/pages/Dashboard.jsx (new — protected, shows welcome + role + logout)
+- frontend/src/App.jsx (rewritten — now holds the route table instead of the placeholder screen)
+- frontend/src/main.jsx (edited — wraps App in BrowserRouter + AuthProvider)
+- frontend/src/index.css (edited — added auth/form styles using existing design tokens; folded in the wordmark/tagline styles previously in App.css)
+- frontend/src/App.css (deleted — styles merged into index.css)
+
+What was tested (by Claude Code):
+- Could NOT run the SQL migration myself — I don't have access to this project's live Supabase instance/dashboard. backend/sql/001_profiles.sql contains the exact SQL from the spec, saved verbatim, ready for the product owner to run in the Supabase SQL editor.
+- Confirmed backend/.env and frontend/.env are currently empty (no real Supabase project wired up yet), so full signup/login/role flow against a real database has NOT been tested end-to-end.
+- Backend: booted `node src/index.js` with temporary placeholder Supabase credentials (not saved to .env) to confirm the server starts without crashing and the route wiring is correct
+- Backend: curled GET /api/me with no Authorization header — confirmed 401 {"error":"Unauthorized"}
+- Backend: curled GET /api/me with a garbage Bearer token — confirmed 401 {"error":"Unauthorized"} and the server stayed up (no crash/unhandled rejection)
+- Backend: confirmed GET /api/health still works alongside the new route
+- Frontend: booted `npm run dev` with temporary placeholder Supabase credentials (not left in .env) and curled every new module (App.jsx, AuthContext.jsx, ProtectedRoute.jsx, Register.jsx, Login.jsx, Dashboard.jsx) — all returned 200 with no Vite compile errors
+- Reverted frontend/.env back to empty after the smoke test so no fake credentials are left in place
+- Killed stray background dev-server processes by PID afterward (did not use a blanket "kill all node" this time)
+
+Expected result:
+- Once real Supabase credentials are in place and the SQL migration has been run: registering as tenant/landlord/agent creates a profiles row with the matching role via the trigger, login redirects to /dashboard, /dashboard shows the right name/role, and GET /api/me returns 401 with no/invalid token and the correct profile with a valid one
+
+Actual result:
+- Code compiles and the server boots cleanly; 401 behavior on missing/invalid tokens confirmed
+- Full registration → trigger → profile → dashboard → /api/me round trip is UNVERIFIED — needs real Supabase credentials, which I don't have
+
+Status: PARTIAL — code complete, structurally tested, but the live auth flow against a real Supabase project has not been run yet
+
+How to test this yourself:
+1. Start both servers: run the SQL in backend/sql/001_profiles.sql in your Supabase project's SQL editor first. Then fill in backend/.env (PORT=5050, SUPABASE_URL, SUPABASE_SERVICE_KEY — service key from Project Settings > API) and frontend/.env (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY — anon key from the same page). Run `npm install` then `node src/index.js` in /backend, and `npm install` then `npm run dev` in /frontend (separate terminals).
+2. Register as each role: open the frontend URL Vite prints, go to /register. Fill in full name, email, password, phone, and pick "Tenant" from the role dropdown, submit. You should land on /dashboard showing "Welcome, <full name>" and "Role: tenant". Repeat with a new email for "Landlord" (dashboard should show "Role: landlord") and again for "Agent" (dashboard should show "Role: agent"). Note: Admin is intentionally not selectable here.
+3. Confirm /api/me: with no token, run `curl -i http://localhost:5050/api/me` — expect HTTP 401 and {"error":"Unauthorized"}. For a valid token: while logged in on the frontend, open browser DevTools > Application (Chrome) or Storage (Firefox) > Local Storage > your frontend origin, find the key like `sb-<project-ref>-auth-token`, open it, and copy the `access_token` value from the JSON. Then run `curl -i http://localhost:5050/api/me -H "Authorization: Bearer <access_token>"` — expect HTTP 200 and {"user_id","full_name","role","phone"} matching the account you registered.
+4. Failed login/register errors: try registering with an email that's already in use — the Register page should show a red inline error box above the form (e.g. "User already registered"), not a blank screen or console-only error. Try logging in with a wrong password — Login should show a similar inline error (e.g. "Invalid login credentials"). In both cases the form stays on screen and is re-submittable.
+
+Notes: This is the first task that actually needs live Supabase credentials — neither .env file has them yet, so steps 2-4 above are untested by me and need to be run by the product owner (or Claude Code again once credentials are supplied). Everything I could verify without a live project (server boot, route wiring, 401 handling, module compilation) passed.
+
+---
+Date: 2026-09-10
+Feature/Task: Auth & role assignment — live re-test now that credentials were added to .env
+Files changed:
+- frontend/.env (fixed — SUPABASE_URL had a trailing /rest/v1/ that broke every auth call; corrected to the bare project URL, with product owner's confirmation)
+- backend/.env (same fix)
+
+What was tested (by Claude Code):
+- Reviewed middleware/auth.js and the frontend auth pages again for correctness — no issues found
+- Started both servers with the real credentials and drove the actual UI in a browser (Chrome, via claude-in-chrome) rather than just curling endpoints
+- Registered as tenant through the real /register form with SUPABASE_URL still misconfigured (the /rest/v1/ suffix) — confirmed the inline error box correctly surfaced Supabase's own error message ("Invalid path specified in request URL"), proving Register.jsx's error handling works
+- Flagged the misconfigured URL to the product owner, got explicit confirmation, then corrected SUPABASE_URL in both .env files and restarted both servers
+- Re-ran registration through the UI with the corrected URL — request reached Supabase's auth API successfully, then correctly rejected "@example.com" as a non-deliverable test domain (Supabase's own validation) — retried with a "@gmail.com"-style address
+- That signup succeeded at the Supabase Auth level, but the app redirected to /dashboard then bounced to /login with no message. Diagnosed why: confirmed via the Supabase Admin API (GET /auth/v1/admin/users) that this project has "Confirm email" enabled — auth.users was created correctly with user_metadata.role="tenant" intact, but no session is issued until the email is confirmed, so ProtectedRoute correctly redirects to /login (working as designed, just with no user-facing explanation)
+- Attempted to log in with the unconfirmed account — got the inline error "Email not confirmed", confirming Login.jsx's error handling also works correctly
+- Queried the `profiles` table directly via the Supabase REST API using the service_role key to check whether the trigger fired — got back {"message":"Could not find the table 'public.profiles' in the schema cache"}. This means backend/sql/001_profiles.sql has NOT been run in this Supabase project yet — the profiles table, RLS policies, and the on_auth_user_created trigger don't exist
+
+Expected result:
+- profiles table exists, trigger fires on signup, profile row is created with the correct role
+
+Actual result:
+- profiles table does not exist yet in this Supabase project — this is a DATABASE SETUP step that hasn't been done, not a code bug
+- Everything that doesn't depend on the profiles table (auth.users creation, role/name/phone passed correctly via signup metadata, inline error handling for bad URL/bad email domain/unconfirmed email) works correctly
+
+Status: BLOCKED — cannot complete the full registration → profile → dashboard → /api/me test until backend/sql/001_profiles.sql is run in the Supabase SQL editor
+
+How to test this yourself:
+1. Run backend/sql/001_profiles.sql in the Supabase SQL editor for this project (this has not been done yet — that's what's currently blocking the rest of the flow)
+2. Decide on email confirmation: this project currently has "Confirm email" enabled (Authentication > Providers > Email in the Supabase dashboard), which means new users can't log in until they click a link in a confirmation email, and our Register page doesn't currently tell users that — it just silently ends up back on /login. For fast local testing, you can either disable "Confirm email" in that dashboard setting, or manually confirm a test user via the dashboard (Authentication > Users > select user > Confirm email)
+3. Once both of the above are done, re-run the steps from the previous entry (register as tenant/landlord/agent, check /dashboard, check /api/me with a real token) — ask Claude Code to re-test once you've done this and I'll verify the full flow live
+4. What a failed login/register error looks like on screen: confirmed working — a red inline box above the form with Supabase's own message, e.g. "Invalid login credentials", "Email not confirmed", "User already registered". Confirmed live in the browser, not just in theory.
+
+Notes: The auth.users row from my "settleng.tenant.qa1@gmail.com" test signup is still sitting in your Supabase project (unconfirmed, no profile). Safe to leave it or delete it via Authentication > Users — it won't affect anything since it's not linked to a profiles row. Once you run the SQL migration, that existing auth.users row will NOT automatically get a profiles row (the trigger only fires on new signups) — you'd need to register a fresh test account, or manually insert a profiles row for it, to test with it specifically.
+
+---
+Date: 2026-09-10
+Feature/Task: Auth & role assignment — final live re-test, full flow confirmed
+Files changed:
+- backend/sql/002_fix_trigger.sql (new — grants supabase_auth_admin access to public.profiles/user_role and pins the trigger function's search_path; fixes "Database error saving new user")
+
+What was tested (by Claude Code):
+- After 002_fix_trigger.sql was run and "Confirm email" was disabled (both product owner actions), reproduced signup directly against Supabase's auth API — got back a real session (200, access_token) instead of the earlier 500 "Database error saving new user"
+- Queried profiles via the service role key — confirmed the trigger now creates a row correctly, matching the signed-up account's full_name/phone/role
+- Also saw the product owner's own real signup ("Ikong Jessi") had already landed a correct profiles row moments earlier, independently confirming the fix
+- Called GET /api/me on the running backend with a real access token — got back 200 {"user_id","full_name":"Debug Tenant Three","role":"tenant","phone":"08012345678"}, exactly matching the profile
+- Logged in through the actual frontend UI (browser-driven, not curl) with the debug account — landed on /dashboard showing "Welcome, Debug Tenant Three" and "Role: tenant"
+- Clicked Log out on the dashboard — redirected to /login as expected
+- Manually navigated back to /dashboard with no session — ProtectedRoute correctly redirected to /login, no flash of protected content
+
+Expected result:
+- Full registration → trigger → profile → login → dashboard → /api/me → logout round trip works correctly
+
+Actual result:
+- Matches expected exactly, verified live end-to-end through both the API and the browser UI
+
+Status: PASS
+
+How to test this yourself:
+1. Start both servers as in prior entries (backend/.env and frontend/.env already have working credentials; backend/sql/001_profiles.sql and 002_fix_trigger.sql have both been run against this Supabase project, and "Confirm email" is currently disabled)
+2. Register as each role at /register (tenant/landlord/agent) — each should land on /dashboard immediately showing "Welcome, <full name>" and the matching "Role: <role>"
+3. Log out from the dashboard — should return to /login. Try navigating directly to /dashboard while logged out — should redirect to /login, not show any dashboard content
+4. GET http://localhost:5050/api/me with no token → 401 {"error":"Unauthorized"}. With a valid token (grab access_token from DevTools localStorage key sb-<project-ref>-auth-token while logged in, or from the network response of the login call) → 200 with the matching user_id/full_name/role/phone
+
+Notes: Two follow-up items for the product owner to decide on, not blockers: (1) "Confirm email" is currently OFF for ease of local testing — decide when to turn it back on for production, and note Register.jsx doesn't yet show a "check your email" message if it's re-enabled, so that'd need a small addition first. (2) Supabase's default/shared mailer has a very low rate limit (we hit "email rate limit exceeded" during testing after a handful of signups) — if email confirmation is re-enabled, a custom SMTP provider should be configured in Supabase before real users start signing up.
