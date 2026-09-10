@@ -422,10 +422,40 @@ a {
   color: #555;
 }
 
+.badge-draft {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(168, 68, 45, 0.12);
+  color: var(--color-rust);
+  text-transform: uppercase;
+}
+
 .property-type-label {
   color: var(--color-ink);
   opacity: 0.7;
   margin: 4px 0 16px;
+}
+
+.owner-actions {
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.owner-actions .btn-primary {
+  width: auto;
+  padding: 10px 24px;
+  margin-top: 0;
+}
+
+.owner-actions-hint {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
 }
 
 .property-street {

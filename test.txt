@@ -285,4 +285,34 @@ How to test this yourself:
 5. Confirm cross-owner protection: create a second landlord account, grab its access token, and try `curl -X PATCH http://localhost:5050/api/properties/<first landlord's property id> -H "Authorization: Bearer <second landlord's token>" -H "Content-Type: application/json" -d "{\"title\":\"hijacked\"}"` — expect 403 {"error":"You do not own this property"}. Same for DELETE.
 
 Notes: Left 4 real test properties in the Supabase project from this session (2 published Lagos ones with full/partial pricing, 1 published Cross River one, 1 draft "UI Image Upload Test" with an uploaded test image and no pricing at all) — safe to delete via the Supabase dashboard or leave as demo data, your call. Also left 2 test landlord accounts (settleng.landlord.qa1@gmail.com, settleng.landlord.qa2@gmail.com, both password TestPass123!). One design decision worth confirming with you: the "owner can preview their own draft" behavior I added isn't explicitly in the spec — it matches the RLS policy's intent exactly, but if you'd rather drafts be truly invisible to everyone including the owner until published, let me know and I'll revert that part.
+
+---
+Date: 2026-09-10
+Feature/Task: Publish button on PropertyDetail (fixes "my listing disappeared from Browse")
+Files changed:
+- frontend/src/pages/PropertyDetail.jsx (edited — added a "Publish listing" button, visible only to the owner while status is 'draft'; refactored detail-fetching into a reusable loadProperty() function)
+- frontend/src/index.css (edited — added .badge-draft and .owner-actions styles)
+
+What was tested (by Claude Code):
+- Product owner reported creating a property that "appeared on the browse page but is no longer there." Checked the actual database directly (service role query) — the listing was status:"draft" and had never been updated since creation, meaning it was never actually on the Browse page (which only shows status:"available"). Explained this to the product owner: the create flow correctly redirects to the listing's own detail page, which (due to the owner-preview fix from the previous entry) DOES show a draft to its owner — that's very likely what read as "it appeared" before it "disappeared" from Browse, which never actually had it.
+- Published the product owner's real listing via the API so it's live now.
+- Built the requested Publish button and FOUND A REAL BUG while testing it live: clicking Publish called the PATCH endpoint (which succeeded), then set the page's `property` state directly from the PATCH response — but PATCH's response shape doesn't include the `images`/`move_in_cost` fields the detail page renders (those are only added by GET /api/properties/:id). This crashed the whole page (blank white screen, confirmed via console: "An error occurred in the <PropertyDetail> component"), even though the publish itself had actually succeeded server-side.
+- Fixed by re-fetching the full detail via GET after a successful PATCH instead of trusting the PATCH response's shape. Retested with a fresh draft property end-to-end: clicked Publish, page stayed fully rendered (no crash), draft badge and Publish button correctly disappeared, confirmed zero console errors, and confirmed the listing now appears on /properties.
+- Cleaned up the two throwaway test properties created during this repro (soft-deleted, status:"unavailable").
+
+Expected result:
+- A logged-in owner sees a "Publish listing" button on their own draft, clicking it makes the listing available without crashing the page
+
+Actual result:
+- Matches expected, after the fix
+
+Status: PASS
+
+How to test this yourself:
+1. Log in as the property's owner and open its detail page while it's still in "draft" status (an orange/rust "draft" badge and a "Publish listing" button should be visible — visible only to you, the owner, not to other visitors)
+2. Click "Publish listing" — the button should briefly say "Publishing...", then the draft badge and button should both disappear with no blank/broken page
+3. Visit /properties (Browse) and confirm the listing now appears there
+4. If you still see a blank page or a console error mentioning PropertyDetail after clicking Publish, that's a regression of the bug described above
+
+Notes: This also fully explains and resolves the "my listing disappeared" report — nothing was ever lost; the listing was in draft the whole time and there was previously no way to publish it from the UI. Product owner's real listing ("Well-furnished room and parlour") is now published and visible on Browse.
     
