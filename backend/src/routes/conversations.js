@@ -178,6 +178,7 @@ router.get('/', async (req, res) => {
       other_party_name: isTenant
         ? conversation.owner?.full_name ?? null
         : conversation.tenant?.full_name ?? null,
+      other_party_id: isTenant ? conversation.owner_id : conversation.tenant_id,
       last_message: lastMessage
         ? { body: lastMessage.body, created_at: lastMessage.created_at }
         : null,

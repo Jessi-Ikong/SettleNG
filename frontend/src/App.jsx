@@ -12,6 +12,7 @@ import MyProperties from './pages/MyProperties'
 import TenantInspections from './pages/TenantInspections'
 import OwnerInspections from './pages/OwnerInspections'
 import Messages from './pages/Messages'
+import AdminReports from './pages/AdminReports'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -102,6 +103,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Messages />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute>
+              <AdminReports />
             </ProtectedRoute>
           }
         />

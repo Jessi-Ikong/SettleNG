@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { canEditOrDelete, editMessage, deleteMessage } from '../lib/messagesApi'
+import ReportButton from '../components/ReportButton'
 
 function formatMessageTime(dateString) {
   return new Date(dateString).toLocaleString('en-NG', {
@@ -400,9 +401,17 @@ export default function Messages() {
                 >
                   {activeConversation.property.title}
                 </Link>
-                <p className="messages-thread-other">
-                  {activeConversation.other_party_name}
-                </p>
+                <div className="messages-thread-other-row">
+                  <p className="messages-thread-other">
+                    {activeConversation.other_party_name}
+                  </p>
+                  {activeConversation.other_party_id && (
+                    <ReportButton
+                      targetType="user"
+                      targetId={activeConversation.other_party_id}
+                    />
+                  )}
+                </div>
               </div>
             </div>
 

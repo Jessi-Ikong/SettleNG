@@ -6,6 +6,7 @@ import { fetchTotalUnreadCount } from '../lib/messagesApi'
 export default function Nav() {
   const { user, profile } = useAuth()
   const canList = profile && ['landlord', 'agent'].includes(profile.role)
+  const isAdmin = profile?.role === 'admin'
   const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function Nav() {
             )}
           </Link>
         )}
+        {isAdmin && <Link to="/admin/reports">Admin</Link>}
         {user ? (
           <Link to="/dashboard">Dashboard</Link>
         ) : (

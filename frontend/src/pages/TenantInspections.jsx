@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { INSPECTION_STATUS_META, formatInspectionDate } from '../lib/inspections'
+import ReportButton from '../components/ReportButton'
 
 const UPCOMING_STATUSES = ['requested', 'accepted', 'rescheduled']
 const HISTORY_STATUSES = ['rejected', 'cancelled', 'no_show']
@@ -104,9 +105,17 @@ export default function TenantInspections() {
               Owner: "{inspection.owner_response_note}"
             </p>
           )}
-          <p className="inspection-other-party">
-            Owner: {inspection.other_party_name}
-          </p>
+          <div className="inspection-other-party-row">
+            <p className="inspection-other-party">
+              Owner: {inspection.other_party_name}
+            </p>
+            {inspection.other_party_id && (
+              <ReportButton
+                targetType="user"
+                targetId={inspection.other_party_id}
+              />
+            )}
+          </div>
           {rowErrors[inspection.id] && (
             <div className="form-error">{rowErrors[inspection.id]}</div>
           )}

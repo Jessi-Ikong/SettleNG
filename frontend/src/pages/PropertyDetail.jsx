@@ -7,6 +7,7 @@ import { fetchFavoritedIds } from '../lib/favoritesApi'
 import FavoriteButton from '../components/FavoriteButton'
 import RequestInspectionButton from '../components/RequestInspectionButton'
 import MessageButton from '../components/MessageButton'
+import ReportButton from '../components/ReportButton'
 import { PRICING_FIELDS, PROPERTY_TYPES } from '../lib/amenities'
 
 function formatNaira(amount) {
@@ -132,6 +133,7 @@ export default function PropertyDetail() {
             propertyId={property.id}
             initialFavorited={isFavorited}
           />
+          <ReportButton targetType="property" targetId={property.id} />
         </div>
 
         <p className="property-type-label">{typeLabel}</p>

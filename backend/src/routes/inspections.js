@@ -8,7 +8,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const INSPECTION_JOIN = `
-  id, property_id, status, requested_date, requested_time, note,
+  id, property_id, tenant_id, owner_id, status, requested_date, requested_time, note,
   owner_response_note, created_at, updated_at,
   property:property_id(
     title,
@@ -68,6 +68,7 @@ function toInspectionCard(row, viewerRole) {
       viewerRole === 'tenant'
         ? row.owner?.full_name ?? null
         : row.tenant?.full_name ?? null,
+    other_party_id: viewerRole === 'tenant' ? row.owner_id : row.tenant_id,
   }
 }
 
