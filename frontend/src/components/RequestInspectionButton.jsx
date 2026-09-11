@@ -15,8 +15,7 @@ export default function RequestInspectionButton({ property }) {
 
   if (
     !user ||
-    profile?.role !== 'tenant' ||
-    profile.id === property.owner_id ||
+    profile?.id === property.owner_id ||
     property.status !== 'available'
   ) {
     return null
