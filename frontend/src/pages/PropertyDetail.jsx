@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { fetchFavoritedIds } from '../lib/favoritesApi'
 import FavoriteButton from '../components/FavoriteButton'
 import RequestInspectionButton from '../components/RequestInspectionButton'
+import MessageButton from '../components/MessageButton'
 import { PRICING_FIELDS, PROPERTY_TYPES } from '../lib/amenities'
 
 function formatNaira(amount) {
@@ -185,6 +186,7 @@ export default function PropertyDetail() {
 
         <div className="property-inspection-cta">
           <RequestInspectionButton property={property} />
+          <MessageButton property={property} />
         </div>
 
         {property.amenities?.length > 0 && (

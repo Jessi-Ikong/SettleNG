@@ -11,6 +11,7 @@ import SavedSearches from './pages/SavedSearches'
 import MyProperties from './pages/MyProperties'
 import TenantInspections from './pages/TenantInspections'
 import OwnerInspections from './pages/OwnerInspections'
+import Messages from './pages/Messages'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -85,6 +86,22 @@ function App() {
           element={
             <ProtectedRoute>
               <OwnerInspections />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <Messages />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/:conversationId"
+          element={
+            <ProtectedRoute>
+              <Messages />
             </ProtectedRoute>
           }
         />
