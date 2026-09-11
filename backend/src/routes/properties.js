@@ -543,7 +543,10 @@ router.get('/:id', async (req, res) => {
     ...propertyFields,
     images,
     move_in_cost: computeMoveInCost(property),
-    owner_name: isOwner || isAdmin ? owner?.full_name ?? null : null,
+    // Shown to every viewer (not just the owner/an admin) so a
+    // prospective tenant can see who they'd be dealing with and look
+    // up that landlord's reviews — the whole point of this field.
+    owner_name: owner?.full_name ?? null,
   })
 })
 

@@ -9,6 +9,8 @@ import RequestInspectionButton from '../components/RequestInspectionButton'
 import MessageButton from '../components/MessageButton'
 import ReportButton from '../components/ReportButton'
 import PropertyListingDetail from '../components/PropertyListingDetail'
+import ReviewsSummary from '../components/ReviewsSummary'
+import ReviewsList from '../components/ReviewsList'
 
 export default function PropertyDetail() {
   const { id } = useParams()
@@ -118,6 +120,13 @@ export default function PropertyDetail() {
           <ReportButton targetType="property" targetId={property.id} />
         </div>
 
+        <div className="property-owner-block">
+          <p className="property-owner-name">
+            Owner: {property.owner_name || 'Unknown'}
+          </p>
+          <ReviewsSummary userId={property.owner_id} />
+        </div>
+
         {profile?.id === property.owner_id && property.status === 'draft' && (
           <div className="owner-actions">
             {publishError && <div className="form-error">{publishError}</div>}
@@ -141,6 +150,9 @@ export default function PropertyDetail() {
         </div>
 
         <PropertyListingDetail property={property} />
+
+        <h2>Reviews</h2>
+        <ReviewsList userId={property.owner_id} />
       </div>
     </div>
   )

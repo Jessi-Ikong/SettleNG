@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { INSPECTION_STATUS_META, formatInspectionDate } from '../lib/inspections'
 import ReportButton from '../components/ReportButton'
+import ReviewForm from '../components/ReviewForm'
 
 const UPCOMING_STATUSES = ['requested', 'accepted', 'rescheduled']
 const HISTORY_STATUSES = ['rejected', 'cancelled', 'no_show']
@@ -13,6 +14,8 @@ export default function TenantInspections() {
   const [loading, setLoading] = useState(true)
   const [rowErrors, setRowErrors] = useState({})
   const [busyId, setBusyId] = useState(null)
+  const [eligibleIds, setEligibleIds] = useState(null)
+  const [openReviewId, setOpenReviewId] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -26,9 +29,30 @@ export default function TenantInspections() {
     })
   }
 
+  const loadEligible = () => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch(`${API_BASE_URL}/api/reviews/eligible`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then((res) => res.json())
+        .then((data) =>
+          setEligibleIds(new Set((data.items || []).map((i) => i.inspection_id))),
+        )
+    })
+  }
+
   useEffect(() => {
     load()
+    loadEligible()
   }, [])
+
+  const handleReviewed = (inspectionId) => {
+    setEligibleIds((prev) => {
+      const next = new Set(prev)
+      next.delete(inspectionId)
+      return next
+    })
+  }
 
   const handleAction = async (id, status) => {
     const previous = items
@@ -118,6 +142,29 @@ export default function TenantInspections() {
           </div>
           {rowErrors[inspection.id] && (
             <div className="form-error">{rowErrors[inspection.id]}</div>
+          )}
+
+          {inspection.status === 'completed' && eligibleIds && (
+            <div className="inspection-review-block">
+              {openReviewId === inspection.id ? (
+                <ReviewForm
+                  inspectionId={inspection.id}
+                  onSubmitted={() => handleReviewed(inspection.id)}
+                />
+              ) : eligibleIds.has(inspection.id) ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setOpenReviewId(inspection.id)}
+                >
+                  Leave a review
+                </button>
+              ) : (
+                <button type="button" className="btn-secondary" disabled>
+                  Review submitted
+                </button>
+              )}
+            </div>
           )}
         </div>
 

@@ -1674,3 +1674,146 @@ a {
   font-size: 0.85rem;
   font-weight: 500;
 }
+
+/* --- Reviews --- */
+
+.property-owner-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.property-owner-block .property-owner-name {
+  margin: 0;
+}
+
+.reviews-summary {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-brass);
+}
+
+.reviews-summary-empty {
+  color: var(--color-ink);
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.star-rating {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.star {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: rgba(23, 48, 74, 0.25);
+  cursor: default;
+}
+
+.star-rating-interactive .star {
+  cursor: pointer;
+  font-size: 1.3rem;
+}
+
+.star-filled {
+  color: var(--color-brass);
+}
+
+.review-form {
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.review-form-rating-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-form-rating-row label {
+  margin: 0;
+}
+
+.review-confirmation {
+  margin-top: 8px;
+  background: var(--bg-success);
+  color: var(--color-success);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.inspection-review-block {
+  margin-top: 8px;
+}
+
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.review-card {
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.review-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.review-card-reviewer {
+  font-weight: 700;
+}
+
+.review-card-date {
+  font-size: 0.78rem;
+  opacity: 0.65;
+}
+
+.review-card-property {
+  margin: 2px 0 8px;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.review-card-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.review-card-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.review-card-comment {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.85;
+}
