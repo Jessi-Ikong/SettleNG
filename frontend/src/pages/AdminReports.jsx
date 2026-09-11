@@ -8,6 +8,7 @@ import {
   REPORT_STATUS_META,
   formatReportDate,
 } from '../lib/reports'
+import PropertyListingDetail from '../components/PropertyListingDetail'
 
 const STATUS_FILTERS = ['all', 'pending', 'reviewed', 'actioned', 'dismissed']
 
@@ -31,6 +32,7 @@ export default function AdminReports() {
   const [rowErrors, setRowErrors] = useState({})
   const [busyId, setBusyId] = useState(null)
   const [propertyBusyId, setPropertyBusyId] = useState(null)
+  const [propertyPreviews, setPropertyPreviews] = useState({})
 
   const load = () => {
     setLoading(true)
@@ -55,6 +57,29 @@ export default function AdminReports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, authLoading, filter])
 
+  const loadPropertyPreview = async (propertyId) => {
+    setPropertyPreviews((prev) => ({
+      ...prev,
+      [propertyId]: { loading: true, data: null, error: '' },
+    }))
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const res = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const body = await res.json()
+
+    setPropertyPreviews((prev) => ({
+      ...prev,
+      [propertyId]: res.ok
+        ? { loading: false, data: body, error: '' }
+        : { loading: false, data: null, error: body.error || 'Failed to load listing' },
+    }))
+  }
+
   const toggleExpand = (report) => {
     if (expandedId === report.id) {
       setExpandedId(null)
@@ -63,6 +88,10 @@ export default function AdminReports() {
     setExpandedId(report.id)
     setDraftStatus(report.status)
     setDraftNotes(report.admin_notes || '')
+
+    if (report.target_type === 'property' && !propertyPreviews[report.target_id]) {
+      loadPropertyPreview(report.target_id)
+    }
   }
 
   const handleSave = async (id) => {
@@ -129,6 +158,18 @@ export default function AdminReports() {
           ? { ...r, target_property_status: nextStatus }
           : r,
       ),
+    )
+
+    setPropertyPreviews((prev) =>
+      prev[propertyId]?.data
+        ? {
+            ...prev,
+            [propertyId]: {
+              ...prev[propertyId],
+              data: { ...prev[propertyId].data, status: nextStatus },
+            },
+          }
+        : prev,
     )
   }
 
@@ -268,6 +309,25 @@ export default function AdminReports() {
 
                     {rowErrors[report.id] && (
                       <div className="form-error">{rowErrors[report.id]}</div>
+                    )}
+
+                    {report.target_type === 'property' && (
+                      <div className="admin-report-listing-preview">
+                        {propertyPreviews[report.target_id]?.loading && (
+                          <p className="inspection-empty">Loading listing...</p>
+                        )}
+                        {propertyPreviews[report.target_id]?.error && (
+                          <p className="inspection-empty">
+                            {propertyPreviews[report.target_id].error}
+                          </p>
+                        )}
+                        {propertyPreviews[report.target_id]?.data && (
+                          <PropertyListingDetail
+                            property={propertyPreviews[report.target_id].data}
+                            ownerName={propertyPreviews[report.target_id].data.owner_name}
+                          />
+                        )}
+                      </div>
                     )}
 
                     <div className="form-field">

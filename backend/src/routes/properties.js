@@ -494,7 +494,9 @@ router.get('/:id', async (req, res) => {
 
   const { data: property, error } = await supabase
     .from('properties')
-    .select(`*, ${LOCATION_JOIN}, property_images(id, url, sort_order)`)
+    .select(
+      `*, ${LOCATION_JOIN}, property_images(id, url, sort_order), owner:owner_id(full_name)`,
+    )
     .eq('id', id)
     .maybeSingle()
 
@@ -504,21 +506,30 @@ router.get('/:id', async (req, res) => {
 
   // This endpoint is public (no auth required), and the backend uses
   // the service-role key which bypasses RLS — so we replicate the
-  // same "available, or you own it" visibility rule from the
-  // properties RLS policy here in application code. A token is
-  // optional: if one is present and it resolves to the owner, they
-  // can view their own non-available (e.g. draft) listing too.
+  // same "available, or you own it, or you're an admin" visibility
+  // rule from the properties RLS policy here in application code. A
+  // token is optional: if one is present and it resolves to the
+  // owner or an admin, they can view a non-available (e.g. draft or
+  // suspended) listing too.
   let isOwner = false
+  let isAdmin = false
   const authHeader = req.headers.authorization || ''
   if (authHeader.startsWith('Bearer ') && property) {
     const token = authHeader.slice('Bearer '.length)
     const { data: authData } = await supabase.auth.getUser(token)
     if (authData?.user?.id === property.owner_id) {
       isOwner = true
+    } else if (authData?.user) {
+      const { data: viewerProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .maybeSingle()
+      isAdmin = viewerProfile?.role === 'admin'
     }
   }
 
-  if (!property || (property.status !== 'available' && !isOwner)) {
+  if (!property || (property.status !== 'available' && !isOwner && !isAdmin)) {
     return res.status(404).json({ error: `Property ${id} not found` })
   }
 
@@ -526,10 +537,13 @@ router.get('/:id', async (req, res) => {
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
   )
 
+  const { owner, ...propertyFields } = property
+
   res.json({
-    ...property,
+    ...propertyFields,
     images,
     move_in_cost: computeMoveInCost(property),
+    owner_name: isOwner || isAdmin ? owner?.full_name ?? null : null,
   })
 })
 

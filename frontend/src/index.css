@@ -1652,3 +1652,25 @@ a {
   font-style: italic;
   opacity: 0.85;
 }
+
+.admin-report-listing-preview {
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.admin-report-listing-preview .property-gallery {
+  margin-bottom: 12px;
+}
+
+.admin-report-listing-preview h2 {
+  font-size: 1.05rem;
+  margin: 16px 0 8px;
+}
+
+.property-owner-name {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
