@@ -9,6 +9,8 @@ import PropertyList from './pages/PropertyList'
 import SavedProperties from './pages/SavedProperties'
 import SavedSearches from './pages/SavedSearches'
 import MyProperties from './pages/MyProperties'
+import TenantInspections from './pages/TenantInspections'
+import OwnerInspections from './pages/OwnerInspections'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -67,6 +69,22 @@ function App() {
           element={
             <ProtectedRoute>
               <SavedSearches />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inspections/tenant"
+          element={
+            <ProtectedRoute>
+              <TenantInspections />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inspections/owner"
+          element={
+            <ProtectedRoute>
+              <OwnerInspections />
             </ProtectedRoute>
           }
         />

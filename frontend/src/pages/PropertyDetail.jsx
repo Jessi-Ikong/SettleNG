@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { fetchFavoritedIds } from '../lib/favoritesApi'
 import FavoriteButton from '../components/FavoriteButton'
+import RequestInspectionButton from '../components/RequestInspectionButton'
 import { PRICING_FIELDS, PROPERTY_TYPES } from '../lib/amenities'
 
 function formatNaira(amount) {
@@ -180,6 +181,10 @@ export default function PropertyDetail() {
           )}
           {property.toilets != null && <span>{property.toilets} toilet</span>}
           {property.furnished && <span>{property.furnished}</span>}
+        </div>
+
+        <div className="property-inspection-cta">
+          <RequestInspectionButton property={property} />
         </div>
 
         {property.amenities?.length > 0 && (

@@ -17,6 +17,11 @@ export default function Nav() {
         {canList && <Link to="/my-properties">My Properties</Link>}
         {user && <Link to="/saved-properties">Saved Properties</Link>}
         {user && <Link to="/saved-searches">Saved Searches</Link>}
+        {user && (
+          <Link to={canList ? '/inspections/owner' : '/inspections/tenant'}>
+            Inspections
+          </Link>
+        )}
         {user ? (
           <Link to="/dashboard">Dashboard</Link>
         ) : (
