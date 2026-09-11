@@ -8,6 +8,7 @@ import favoritesRouter from './routes/favorites.js'
 import savedSearchesRouter from './routes/savedSearches.js'
 import inspectionsRouter from './routes/inspections.js'
 import conversationsRouter from './routes/conversations.js'
+import messagesRouter from './routes/messages.js'
 
 const app = express()
 const PORT = process.env.PORT || 5050
@@ -26,6 +27,7 @@ app.use('/api/favorites', favoritesRouter)
 app.use('/api/saved-searches', savedSearchesRouter)
 app.use('/api/inspections', inspectionsRouter)
 app.use('/api/conversations', conversationsRouter)
+app.use('/api/messages', messagesRouter)
 
 app.listen(PORT, () => {
   console.log(`SettleNG API listening on port ${PORT}`)

@@ -1,6 +1,10 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { attachReplyPreviews, toMessageCard } from '../lib/messageShape.js'
+
+const MESSAGE_COLUMNS =
+  'id, conversation_id, sender_id, body, reply_to_id, created_at, read_at, edited_at, deleted_at'
 
 const router = Router()
 
@@ -101,7 +105,7 @@ router.post('/', async (req, res) => {
       sender_id: req.profile.id,
       body: String(body).trim(),
     })
-    .select()
+    .select(MESSAGE_COLUMNS)
     .single()
 
   if (messageError) {
@@ -115,7 +119,7 @@ router.post('/', async (req, res) => {
       property_title: conversation.property?.title ?? null,
       property_first_image: firstImage(conversation.property),
     },
-    message,
+    message: { ...toMessageCard(message), reply_preview: null },
   })
 })
 
@@ -137,15 +141,17 @@ router.get('/', async (req, res) => {
 
   const conversationIds = conversations.map((c) => c.id)
 
-  const { data: messages, error: messagesError } = await supabase
+  const { data: rawMessages, error: messagesError } = await supabase
     .from('messages')
-    .select('id, conversation_id, sender_id, body, created_at, read_at')
+    .select(MESSAGE_COLUMNS)
     .in('conversation_id', conversationIds)
     .order('created_at', { ascending: true })
 
   if (messagesError) {
     return res.status(500).json({ error: messagesError.message })
   }
+
+  const messages = rawMessages.map(toMessageCard)
 
   const messagesByConversation = new Map()
   for (const message of messages) {
@@ -217,7 +223,7 @@ router.get('/:id/messages', async (req, res) => {
   // recent 50), then reverse to oldest-first for display.
   const { data, error, count } = await supabase
     .from('messages')
-    .select('*', { count: 'exact' })
+    .select(MESSAGE_COLUMNS, { count: 'exact' })
     .eq('conversation_id', id)
     .order('created_at', { ascending: false })
     .range(from, to)
@@ -226,8 +232,10 @@ router.get('/:id/messages', async (req, res) => {
     return res.status(500).json({ error: error.message })
   }
 
+  const items = await attachReplyPreviews(supabase, [...data].reverse())
+
   res.json({
-    items: [...data].reverse(),
+    items,
     page,
     pageSize,
     total: count,
@@ -237,13 +245,16 @@ router.get('/:id/messages', async (req, res) => {
 
 router.post('/:id/messages', async (req, res) => {
   const { id } = req.params
-  const { body } = req.body || {}
+  const { body, reply_to_id: replyToId } = req.body || {}
 
   if (!UUID_RE.test(id)) {
     return res.status(404).json({ error: `Conversation ${id} not found` })
   }
   if (!body || !String(body).trim()) {
     return res.status(400).json({ error: 'A message body is required' })
+  }
+  if (replyToId !== undefined && replyToId !== null && !UUID_RE.test(replyToId)) {
+    return res.status(400).json({ error: 'Invalid reply_to_id' })
   }
 
   const membership = await getMembership(id, req.profile.id)
@@ -259,21 +270,41 @@ router.post('/:id/messages', async (req, res) => {
     return res.status(500).json({ error: 'Failed to look up conversation' })
   }
 
+  if (replyToId) {
+    const { data: replyTarget, error: replyError } = await supabase
+      .from('messages')
+      .select('id, conversation_id')
+      .eq('id', replyToId)
+      .maybeSingle()
+
+    if (replyError) {
+      return res.status(500).json({ error: 'Failed to look up reply target' })
+    }
+    if (!replyTarget || replyTarget.conversation_id !== id) {
+      return res
+        .status(400)
+        .json({ error: 'reply_to_id must reference a message in this conversation' })
+    }
+  }
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: id,
       sender_id: req.profile.id,
       body: String(body).trim(),
+      reply_to_id: replyToId || null,
     })
-    .select()
+    .select(MESSAGE_COLUMNS)
     .single()
 
   if (error) {
     return res.status(500).json({ error: error.message })
   }
 
-  res.status(201).json(data)
+  const [item] = await attachReplyPreviews(supabase, [data])
+
+  res.status(201).json(item)
 })
 
 router.patch('/:id/read', async (req, res) => {

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { canEditOrDelete, editMessage, deleteMessage } from '../lib/messagesApi'
 
 function formatMessageTime(dateString) {
   return new Date(dateString).toLocaleString('en-NG', {
@@ -11,6 +12,36 @@ function formatMessageTime(dateString) {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+// Mirrors the backend's toMessageCard shaping so a raw Realtime payload
+// (which includes every column, deleted_body/original_body included)
+// never lets those two fields reach component state or the DOM.
+function shapeRealtimeMessage(raw) {
+  const isDeleted = Boolean(raw.deleted_at)
+  return {
+    id: raw.id,
+    conversation_id: raw.conversation_id,
+    sender_id: raw.sender_id,
+    body: isDeleted ? null : raw.body,
+    reply_to_id: raw.reply_to_id ?? null,
+    created_at: raw.created_at,
+    read_at: raw.read_at,
+    edited: Boolean(raw.edited_at),
+    is_deleted: isDeleted,
+  }
+}
+
+function resolveReplyPreview(replyToId, messagesList, otherPartyName, profile) {
+  const target = messagesList.find((m) => m.id === replyToId)
+  if (!target) return undefined
+  if (target.is_deleted) return { deleted: true }
+  const senderName =
+    target.sender_id === profile?.id ? profile?.full_name : otherPartyName
+  return {
+    sender_name: senderName ?? null,
+    snippet: target.body ? target.body.slice(0, 80) : '',
+  }
 }
 
 export default function Messages() {
@@ -23,9 +54,22 @@ export default function Messages() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [replyTarget, setReplyTarget] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [, setTick] = useState(0)
   const bottomRef = useRef(null)
 
   const activeConversation = conversations.find((c) => c.id === conversationId)
+
+  // Edit/Delete eligibility is time-based (1-hour window), so re-render
+  // periodically even without user interaction — otherwise a tab left
+  // open would keep showing the actions after the window has closed.
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const loadConversations = useCallback(async () => {
     const {
@@ -86,6 +130,9 @@ export default function Messages() {
 
   useEffect(() => {
     loadMessages()
+    setReplyTarget(null)
+    setEditingId(null)
+    setConfirmDeleteId(null)
   }, [loadMessages])
 
   useEffect(() => {
@@ -96,43 +143,77 @@ export default function Messages() {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          setMessages((prev) =>
-            prev.some((m) => m.id === payload.new.id)
-              ? prev
-              : [...prev, payload.new],
-          )
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === conversationId
-                ? {
-                    ...c,
-                    last_message: {
-                      body: payload.new.body,
-                      created_at: payload.new.created_at,
-                    },
-                  }
-                : c,
-            ),
-          )
+          if (payload.eventType === 'INSERT') {
+            const shaped = shapeRealtimeMessage(payload.new)
 
-          if (payload.new.sender_id !== profile?.id) {
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              fetch(
-                `${API_BASE_URL}/api/conversations/${conversationId}/read`,
-                {
-                  method: 'PATCH',
-                  headers: { Authorization: `Bearer ${session.access_token}` },
-                },
-              ).then(() => {
-                window.dispatchEvent(new Event('unread-count-changed'))
-              })
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === shaped.id)) return prev
+              const otherPartyName = conversations.find(
+                (c) => c.id === conversationId,
+              )?.other_party_name
+              const reply_preview = shaped.reply_to_id
+                ? resolveReplyPreview(
+                    shaped.reply_to_id,
+                    prev,
+                    otherPartyName,
+                    profile,
+                  ) ?? { deleted: false }
+                : null
+              return [...prev, { ...shaped, reply_preview }]
             })
+
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === conversationId
+                  ? {
+                      ...c,
+                      last_message: {
+                        body: shaped.body,
+                        created_at: shaped.created_at,
+                      },
+                    }
+                  : c,
+              ),
+            )
+
+            if (payload.new.sender_id !== profile?.id) {
+              supabase.auth.getSession().then(({ data: { session } }) => {
+                fetch(
+                  `${API_BASE_URL}/api/conversations/${conversationId}/read`,
+                  {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  },
+                ).then(() => {
+                  window.dispatchEvent(new Event('unread-count-changed'))
+                })
+              })
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const shaped = shapeRealtimeMessage(payload.new)
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === shaped.id
+                  ? { ...m, ...shaped, reply_preview: m.reply_preview }
+                  : m,
+              ),
+            )
+            setConversations((prev) =>
+              prev.map((c) => {
+                if (c.id !== conversationId) return c
+                if (c.last_message?.created_at !== shaped.created_at) return c
+                return {
+                  ...c,
+                  last_message: { body: shaped.body, created_at: shaped.created_at },
+                }
+              }),
+            )
           }
         },
       )
@@ -141,11 +222,12 @@ export default function Messages() {
     return () => {
       supabase.removeChannel(channel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, profile?.id])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages.length])
 
   const handleSend = async (event) => {
     event.preventDefault()
@@ -164,7 +246,10 @@ export default function Messages() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ body: draft.trim() }),
+        body: JSON.stringify({
+          body: draft.trim(),
+          reply_to_id: replyTarget?.id,
+        }),
       },
     )
 
@@ -173,6 +258,7 @@ export default function Messages() {
     if (res.ok) {
       const message = await res.json()
       setDraft('')
+      setReplyTarget(null)
       setMessages((prev) =>
         prev.some((m) => m.id === message.id) ? prev : [...prev, message],
       )
@@ -190,6 +276,55 @@ export default function Messages() {
         ),
       )
     }
+  }
+
+  const startEdit = (m) => {
+    setConfirmDeleteId(null)
+    setEditingId(m.id)
+    setEditDraft(m.body)
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditDraft('')
+  }
+
+  const saveEdit = async (m) => {
+    if (!editDraft.trim()) return
+    try {
+      const updated = await editMessage(m.id, editDraft.trim())
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === m.id ? { ...msg, ...updated, reply_preview: msg.reply_preview } : msg,
+        ),
+      )
+      setEditingId(null)
+      setEditDraft('')
+    } catch (err) {
+      window.alert(err.message)
+    }
+  }
+
+  const confirmDelete = async (m) => {
+    try {
+      const updated = await deleteMessage(m.id)
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === m.id ? { ...msg, ...updated, reply_preview: msg.reply_preview } : msg,
+        ),
+      )
+      setConfirmDeleteId(null)
+    } catch (err) {
+      window.alert(err.message)
+    }
+  }
+
+  const scrollToMessage = (id) => {
+    const el = document.getElementById(`message-${id}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('message-bubble-highlight')
+    setTimeout(() => el.classList.remove('message-bubble-highlight'), 1200)
   }
 
   if (loadingList) {
@@ -275,25 +410,171 @@ export default function Messages() {
               {loadingMessages ? (
                 <div className="page-loading">Loading...</div>
               ) : (
-                messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={
-                      'message-bubble' +
-                      (m.sender_id === profile?.id
-                        ? ' message-bubble-own'
-                        : ' message-bubble-other')
-                    }
-                  >
-                    <p>{m.body}</p>
-                    <span className="message-bubble-time">
-                      {formatMessageTime(m.created_at)}
-                    </span>
-                  </div>
-                ))
+                messages.map((m) => {
+                  const isOwn = m.sender_id === profile?.id
+                  const editable = canEditOrDelete(m, profile?.id)
+                  const isEditing = editingId === m.id
+                  const isConfirmingDelete = confirmDeleteId === m.id
+
+                  return (
+                    <div
+                      key={m.id}
+                      id={`message-${m.id}`}
+                      className={
+                        'message-bubble' +
+                        (isOwn ? ' message-bubble-own' : ' message-bubble-other')
+                      }
+                    >
+                      {m.reply_preview && (
+                        <button
+                          type="button"
+                          className="message-reply-quote"
+                          onClick={() =>
+                            !m.reply_preview.deleted && scrollToMessage(m.reply_to_id)
+                          }
+                        >
+                          {m.reply_preview.deleted ? (
+                            <em>Original message deleted</em>
+                          ) : (
+                            <>
+                              <span className="message-reply-quote-sender">
+                                {m.reply_preview.sender_name}
+                              </span>
+                              <span className="message-reply-quote-snippet">
+                                {m.reply_preview.snippet}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {m.is_deleted ? (
+                        <p className="message-deleted">This message was deleted</p>
+                      ) : isEditing ? (
+                        <div className="message-edit-row">
+                          <input
+                            type="text"
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            autoFocus
+                          />
+                          <div className="message-edit-actions">
+                            <button
+                              type="button"
+                              className="btn-link"
+                              onClick={() => saveEdit(m)}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-link"
+                              onClick={cancelEdit}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p>
+                          {m.body}
+                          {m.edited && <span className="message-edited-tag"> (edited)</span>}
+                        </p>
+                      )}
+
+                      <span className="message-bubble-time">
+                        {formatMessageTime(m.created_at)}
+                      </span>
+
+                      {!m.is_deleted && !isEditing && (
+                        <div
+                          className={
+                            'message-actions' +
+                            (isConfirmingDelete ? ' message-actions-pinned' : '')
+                          }
+                        >
+                          <button
+                            type="button"
+                            className="message-action-btn"
+                            onClick={() => {
+                              setEditingId(null)
+                              setConfirmDeleteId(null)
+                              setReplyTarget(m)
+                            }}
+                          >
+                            Reply
+                          </button>
+                          {editable && (
+                            <>
+                              <button
+                                type="button"
+                                className="message-action-btn"
+                                onClick={() => startEdit(m)}
+                              >
+                                Edit
+                              </button>
+                              {isConfirmingDelete ? (
+                                <span className="message-delete-confirm">
+                                  Delete?
+                                  <button
+                                    type="button"
+                                    className="message-action-btn"
+                                    onClick={() => confirmDelete(m)}
+                                  >
+                                    Yes
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="message-action-btn"
+                                    onClick={() => setConfirmDeleteId(null)}
+                                  >
+                                    No
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="message-action-btn"
+                                  onClick={() => setConfirmDeleteId(m.id)}
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
               )}
               <div ref={bottomRef} />
             </div>
+
+            {replyTarget && (
+              <div className="messages-reply-preview">
+                <div>
+                  <span className="messages-reply-preview-label">
+                    Replying to {replyTarget.sender_id === profile?.id
+                      ? 'yourself'
+                      : activeConversation.other_party_name}
+                  </span>
+                  <p className="messages-reply-preview-snippet">
+                    {replyTarget.is_deleted
+                      ? 'Original message deleted'
+                      : (replyTarget.body || '').slice(0, 80)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="messages-reply-preview-cancel"
+                  onClick={() => setReplyTarget(null)}
+                  aria-label="Cancel reply"
+                >
+                  ×
+                </button>
+              </div>
+            )}
 
             <form className="messages-input-row" onSubmit={handleSend}>
               <input
