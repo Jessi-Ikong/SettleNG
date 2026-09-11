@@ -11,6 +11,15 @@ import {
 
 const STATUS_FILTERS = ['all', 'pending', 'reviewed', 'actioned', 'dismissed']
 
+const PROPERTY_STATUS_META = {
+  draft: { label: 'Draft', className: 'status-draft' },
+  available: { label: 'Available', className: 'status-available' },
+  pending: { label: 'Pending', className: 'status-pending' },
+  rented: { label: 'Rented', className: 'status-rented' },
+  unavailable: { label: 'Unavailable', className: 'status-unavailable' },
+  suspended: { label: 'Suspended', className: 'status-suspended' },
+}
+
 export default function AdminReports() {
   const { profile, loading: authLoading } = useAuth()
   const [items, setItems] = useState([])
@@ -21,6 +30,7 @@ export default function AdminReports() {
   const [draftNotes, setDraftNotes] = useState('')
   const [rowErrors, setRowErrors] = useState({})
   const [busyId, setBusyId] = useState(null)
+  const [propertyBusyId, setPropertyBusyId] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -82,6 +92,44 @@ export default function AdminReports() {
 
     setItems((prev) => prev.map((r) => (r.id === id ? body : r)))
     setExpandedId(null)
+  }
+
+  const handlePropertyStatusChange = async (report, nextStatus) => {
+    const propertyId = report.target_id
+    setRowErrors((prev) => ({ ...prev, [report.id]: '' }))
+    setPropertyBusyId(report.id)
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const res = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ status: nextStatus }),
+    })
+
+    const body = await res.json()
+    setPropertyBusyId(null)
+
+    if (!res.ok) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [report.id]: body.error || 'Failed to update property status',
+      }))
+      return
+    }
+
+    setItems((prev) =>
+      prev.map((r) =>
+        r.target_type === 'property' && r.target_id === propertyId
+          ? { ...r, target_property_status: nextStatus }
+          : r,
+      ),
+    )
   }
 
   if (authLoading || loading) {
@@ -149,6 +197,52 @@ export default function AdminReports() {
                         report.target_label || 'Unknown user'
                       )}
                     </span>
+
+                    {report.target_type === 'property' &&
+                      report.target_property_status && (
+                        <div
+                          className="admin-report-property-controls"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span
+                            className={`status-badge ${
+                              PROPERTY_STATUS_META[report.target_property_status]
+                                ?.className || ''
+                            }`}
+                          >
+                            {PROPERTY_STATUS_META[report.target_property_status]
+                              ?.label || report.target_property_status}
+                          </span>
+                          {report.target_property_status !== 'suspended' && (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              disabled={propertyBusyId === report.id}
+                              onClick={() =>
+                                handlePropertyStatusChange(report, 'suspended')
+                              }
+                            >
+                              Suspend listing
+                            </button>
+                          )}
+                          {report.target_property_status === 'suspended' && (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              disabled={propertyBusyId === report.id}
+                              onClick={() =>
+                                handlePropertyStatusChange(report, 'available')
+                              }
+                            >
+                              Reinstate
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    {!expanded && rowErrors[report.id] && (
+                      <div className="form-error">{rowErrors[report.id]}</div>
+                    )}
+
                     <span className="admin-report-reason">
                       {REPORT_REASON_LABELS[report.reason] || report.reason}
                     </span>

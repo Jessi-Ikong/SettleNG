@@ -34,14 +34,14 @@ function requireAdmin(req, res, next) {
   next()
 }
 
-async function resolveTargetLabel(targetType, targetId) {
+async function resolveTargetMeta(targetType, targetId) {
   if (targetType === 'property') {
     const { data } = await supabase
       .from('properties')
-      .select('title')
+      .select('title, status')
       .eq('id', targetId)
       .maybeSingle()
-    return data?.title ?? null
+    return { label: data?.title ?? null, propertyStatus: data?.status ?? null }
   }
 
   const { data } = await supabase
@@ -49,15 +49,16 @@ async function resolveTargetLabel(targetType, targetId) {
     .select('full_name')
     .eq('id', targetId)
     .maybeSingle()
-  return data?.full_name ?? null
+  return { label: data?.full_name ?? null, propertyStatus: null }
 }
 
-function toReportCard(row, targetLabel) {
+function toReportCard(row, targetMeta) {
   return {
     id: row.id,
     target_type: row.target_type,
     target_id: row.target_id,
-    target_label: targetLabel,
+    target_label: targetMeta.label,
+    target_property_status: targetMeta.propertyStatus,
     reason: row.reason,
     details: row.details,
     status: row.status,
@@ -120,8 +121,8 @@ router.post('/', async (req, res) => {
   }
 
   if (existing) {
-    const targetLabel = await resolveTargetLabel(targetType, targetId)
-    return res.status(200).json(toReportCard(existing, targetLabel))
+    const targetMeta = await resolveTargetMeta(targetType, targetId)
+    return res.status(200).json(toReportCard(existing, targetMeta))
   }
 
   const { data, error } = await supabase
@@ -140,9 +141,9 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: error.message })
   }
 
-  const targetLabel = await resolveTargetLabel(targetType, targetId)
+  const targetMeta = await resolveTargetMeta(targetType, targetId)
 
-  res.status(201).json(toReportCard(data, targetLabel))
+  res.status(201).json(toReportCard(data, targetMeta))
 })
 
 router.get('/', requireAdmin, async (req, res) => {
@@ -169,8 +170,8 @@ router.get('/', requireAdmin, async (req, res) => {
 
   const items = await Promise.all(
     data.map(async (row) => {
-      const targetLabel = await resolveTargetLabel(row.target_type, row.target_id)
-      return toReportCard(row, targetLabel)
+      const targetMeta = await resolveTargetMeta(row.target_type, row.target_id)
+      return toReportCard(row, targetMeta)
     }),
   )
 
@@ -207,9 +208,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     return res.status(404).json({ error: `Report ${id} not found` })
   }
 
-  const targetLabel = await resolveTargetLabel(data.target_type, data.target_id)
+  const targetMeta = await resolveTargetMeta(data.target_type, data.target_id)
 
-  res.json(toReportCard(data, targetLabel))
+  res.json(toReportCard(data, targetMeta))
 })
 
 export default router

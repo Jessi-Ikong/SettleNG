@@ -1616,6 +1616,18 @@ a {
   text-decoration: none;
 }
 
+.admin-report-property-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.admin-report-property-controls .btn-secondary {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
 .admin-report-reason {
   font-size: 0.85rem;
 }

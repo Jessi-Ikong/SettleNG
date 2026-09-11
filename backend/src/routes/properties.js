@@ -260,7 +260,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
   if (!existing) {
     return res.status(404).json({ error: `Property ${id} not found` })
   }
-  if (existing.owner_id !== req.profile.id) {
+  if (existing.owner_id !== req.profile.id && req.profile.role !== 'admin') {
     return res
       .status(403)
       .json({ error: 'You do not own this property' })
