@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { fetchTotalUnreadCount } from '../lib/messagesApi'
 
 export default function Nav() {
   const { user, profile } = useAuth()
+  const location = useLocation()
   const canList = profile && ['landlord', 'agent'].includes(profile.role)
   const isAdmin = profile?.role === 'admin'
   const [unreadCount, setUnreadCount] = useState(0)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const navRef = useRef(null)
 
   useEffect(() => {
     if (!user) {
@@ -22,37 +25,109 @@ export default function Nav() {
     return () => window.removeEventListener('unread-count-changed', refresh)
   }, [user])
 
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!menuOpen) return
+
+    const handleOutsideClick = (event) => {
+      if (navRef.current && !navRef.current.contains(event.target)) {
+        setMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [menuOpen])
+
+  const closeMenu = () => setMenuOpen(false)
+
   return (
-    <nav className="site-nav">
-      <Link to="/" className="site-nav-brand">
+    <nav className="site-nav" ref={navRef}>
+      <Link to="/" className="site-nav-brand" onClick={closeMenu}>
         <span className="wordmark-settle">Settle</span>
         <span className="wordmark-ng">NG</span>
       </Link>
-      <div className="site-nav-links">
-        <Link to="/properties">Browse</Link>
-        {canList && <Link to="/create-property">List a property</Link>}
-        {canList && <Link to="/my-properties">My Properties</Link>}
-        {user && <Link to="/saved-properties">Saved Properties</Link>}
-        {user && <Link to="/saved-searches">Saved Searches</Link>}
+
+      <button
+        type="button"
+        className="site-nav-toggle"
+        aria-expanded={menuOpen}
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        <span className="site-nav-toggle-icon" aria-hidden="true" />
+        {user && unreadCount > 0 && (
+          <span className="nav-unread-badge site-nav-toggle-badge">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+
+      <div
+        className={
+          'site-nav-links' + (menuOpen ? ' site-nav-links-open' : '')
+        }
+      >
+        <Link to="/properties" onClick={closeMenu}>
+          Browse
+        </Link>
+        {canList && (
+          <Link to="/create-property" onClick={closeMenu}>
+            List a property
+          </Link>
+        )}
+        {canList && (
+          <Link to="/my-properties" onClick={closeMenu}>
+            My Properties
+          </Link>
+        )}
         {user && (
-          <Link to={canList ? '/inspections/owner' : '/inspections/tenant'}>
+          <Link to="/saved-properties" onClick={closeMenu}>
+            Saved Properties
+          </Link>
+        )}
+        {user && (
+          <Link to="/saved-searches" onClick={closeMenu}>
+            Saved Searches
+          </Link>
+        )}
+        {user && (
+          <Link
+            to={canList ? '/inspections/owner' : '/inspections/tenant'}
+            onClick={closeMenu}
+          >
             Inspections
           </Link>
         )}
         {user && (
-          <Link to="/messages" className="nav-messages-link">
+          <Link to="/messages" className="nav-messages-link" onClick={closeMenu}>
             Messages
             {unreadCount > 0 && (
               <span className="nav-unread-badge">{unreadCount}</span>
             )}
           </Link>
         )}
-        {isAdmin && <Link to="/admin">Admin</Link>}
-        {user && <Link to="/profile">Profile</Link>}
+        {isAdmin && (
+          <Link to="/admin" onClick={closeMenu}>
+            Admin
+          </Link>
+        )}
+        {user && (
+          <Link to="/profile" onClick={closeMenu}>
+            Profile
+          </Link>
+        )}
         {!user && (
           <>
-            <Link to="/login">Log in</Link>
-            <Link to="/register">Register</Link>
+            <Link to="/login" onClick={closeMenu}>
+              Log in
+            </Link>
+            <Link to="/register" onClick={closeMenu}>
+              Register
+            </Link>
           </>
         )}
       </div>

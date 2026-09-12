@@ -1,3 +1,11 @@
+/* --- Responsive breakpoints ---
+   Standard convention for every @media query in this file:
+     mobile: max-width: 640px
+     tablet: max-width: 1024px
+   Use one of these two values unless a component's content genuinely
+   needs something else — any exception is called out in a comment
+   right above the query that uses it. */
+
 :root {
   --color-indigo: #17304a;
   --color-brass: #c68a2e;
@@ -67,6 +75,18 @@ a {
 .auth-card h1 {
   font-size: 1.75rem;
   margin: 0 0 24px;
+}
+
+/* The three main "card" containers (auth pages, create/edit property,
+   property detail) all use fairly generous padding that eats too much
+   of a 375px viewport — trim it at mobile. Their max-width is already
+   a cap, not a forced width, so it never causes overflow on its own. */
+@media (max-width: 640px) {
+  .auth-card,
+  .create-property-card,
+  .property-detail-card {
+    padding: 20px;
+  }
 }
 
 .form-field {
@@ -240,10 +260,10 @@ a {
 /* --- Site nav --- */
 
 .site-nav {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 12px;
   padding: 16px 24px;
   background: #fff;
@@ -255,6 +275,55 @@ a {
   font-weight: 900;
   font-size: 1.25rem;
   text-decoration: none;
+}
+
+.site-nav-toggle {
+  display: none;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.site-nav-toggle-icon,
+.site-nav-toggle-icon::before,
+.site-nav-toggle-icon::after {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-indigo);
+}
+
+.site-nav-toggle-icon {
+  position: relative;
+}
+
+.site-nav-toggle-icon::before,
+.site-nav-toggle-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+}
+
+.site-nav-toggle-icon::before {
+  top: -7px;
+}
+
+.site-nav-toggle-icon::after {
+  top: 7px;
+}
+
+.site-nav-toggle-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
 }
 
 .site-nav-links {
@@ -273,6 +342,49 @@ a {
 .site-nav-links a:hover {
   color: var(--color-indigo);
   text-decoration: underline;
+}
+
+/* Nav collapses to a hamburger menu at and below the tablet
+   breakpoint — a phone-width nav has too many links to show inline,
+   and a tablet-width one is tight enough that the same treatment
+   reads better than wrapping. */
+@media (max-width: 1024px) {
+  .site-nav-toggle {
+    display: inline-flex;
+  }
+
+  .site-nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: #fff;
+    border-bottom: 1px solid rgba(23, 48, 74, 0.12);
+    box-shadow: 0 12px 20px rgba(23, 48, 74, 0.1);
+    max-height: calc(100vh - 69px);
+    overflow-y: auto;
+    z-index: 50;
+  }
+
+  .site-nav-links-open {
+    display: flex;
+  }
+
+  .site-nav-links a {
+    padding: 14px 24px;
+    border-top: 1px solid rgba(23, 48, 74, 0.08);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-messages-link {
+    justify-content: space-between;
+  }
 }
 
 /* --- Create property --- */
@@ -303,6 +415,16 @@ a {
 
 .form-row .form-field {
   flex: 1;
+}
+
+/* Two/three-field rows (CreateProperty's bedrooms/bathrooms/toilets,
+   OwnerInspections' reschedule date/time) don't have room to stay
+   side by side at phone width. */
+@media (max-width: 640px) {
+  .form-row {
+    flex-direction: column;
+    gap: 16px;
+  }
 }
 
 .amenities-grid {
@@ -357,6 +479,36 @@ a {
 .btn-secondary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Comfortable tap targets everywhere at phone width — mouse-precision
+   sized buttons/checkboxes are hard to hit with a thumb. */
+@media (max-width: 640px) {
+  .btn-primary,
+  .btn-secondary,
+  .report-button,
+  .filter-pill,
+  select,
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='tel'],
+  input[type='date'],
+  input[type='time'] {
+    min-height: 44px;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .amenity-checkbox {
+    min-height: 36px;
+  }
 }
 
 /* --- Property detail --- */
@@ -479,7 +631,8 @@ a {
 
 .property-facts {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin: 16px 0;
   font-weight: 500;
 }
@@ -631,7 +784,7 @@ a {
   opacity: 0.7;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1024px) {
   .filters-toggle {
     display: inline-block;
   }
@@ -648,6 +801,29 @@ a {
 
   .filters-sidebar.filters-open {
     display: block;
+  }
+}
+
+/* Location signpost trail (state/LGA/ward/neighborhood chips, used in
+   both LocationPicker and PropertyListingDetail) wraps instead of
+   overflowing once there isn't room for every chip on one line. The
+   chevron clip-path/overlap styling only makes sense as one unbroken
+   row, so it's dropped in favor of plain pills once chips can wrap
+   onto more than one line. */
+@media (max-width: 640px) {
+  .signpost-trail {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .signpost-chip {
+    clip-path: none;
+    border-radius: 999px;
+    padding: 8px 14px;
+  }
+
+  .signpost-chip:not(:first-child) {
+    margin-left: 0;
   }
 }
 
@@ -891,6 +1067,14 @@ a {
   text-decoration: none;
   color: var(--color-ink);
   flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .saved-search-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .saved-search-name {
@@ -1032,6 +1216,16 @@ a {
 
 .property-inspection-cta > button {
   align-self: flex-start;
+}
+
+@media (max-width: 640px) {
+  .property-inspection-cta > button {
+    align-self: stretch;
+  }
+
+  .inspection-request-actions {
+    flex-wrap: wrap;
+  }
 }
 
 .inspection-confirmation {
@@ -1277,11 +1471,19 @@ a {
   object-fit: cover;
 }
 
+.messages-thread-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .messages-thread-property {
   display: block;
   font-weight: 700;
   color: var(--color-indigo);
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .messages-thread-other {
@@ -1513,17 +1715,43 @@ a {
   padding: 10px 20px;
 }
 
-@media (max-width: 720px) {
+.messages-back-link {
+  display: none;
+}
+
+/* Below the mobile breakpoint the two-pane layout can't fit side by
+   side, and stacking both panes at once (list capped short, thread
+   squeezed below) is worse than just showing one at a time: the list
+   full-height when no conversation is open, the thread full-height
+   (with a way back) once one is. */
+@media (max-width: 640px) {
   .messages-page {
     flex-direction: column;
-    height: auto;
+    height: calc(100vh - 69px);
   }
 
   .messages-list {
     width: 100%;
-    max-height: 260px;
+    max-height: none;
     border-right: none;
-    border-bottom: 1px solid rgba(23, 48, 74, 0.12);
+  }
+
+  .messages-page-thread-active .messages-list {
+    display: none;
+  }
+
+  .messages-page:not(.messages-page-thread-active) .messages-thread {
+    display: none;
+  }
+
+  .messages-back-link {
+    display: inline-flex;
+    align-items: center;
+    color: var(--color-indigo);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    flex-shrink: 0;
   }
 
   .message-bubble {
@@ -1607,6 +1835,19 @@ a {
   justify-content: space-between;
   gap: 16px;
   cursor: pointer;
+}
+
+/* Every admin list (reports, verifications, users, locations) shares
+   this row/summary structure. At phone width there's no room to keep
+   the thumbnail/text block and its trailing badge, link, or toggle on
+   one line, so the whole row reflows into a stacked card instead of
+   trying to shrink a wide row down. */
+@media (max-width: 640px) {
+  .admin-report-summary {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
 }
 
 .admin-report-main {
@@ -1916,12 +2157,24 @@ a {
 
 .otp-confirm-form input {
   flex: 1;
+  min-width: 0;
   font-family: var(--font-body);
   font-size: 1.1rem;
   letter-spacing: 0.1em;
   padding: 10px 14px;
   border: 1px solid rgba(23, 48, 74, 0.25);
   border-radius: 8px;
+}
+
+/* .btn-primary's own width:100% fights the flex row here — this
+   button sits next to the code input, not alone, so it needs its
+   natural content width instead. Not mobile-specific: this was
+   already broken at any narrow-enough auth-card width. */
+.otp-confirm-form button {
+  width: auto;
+  flex-shrink: 0;
+  margin-top: 0;
+  white-space: nowrap;
 }
 
 .identity-upload-form {
@@ -1950,6 +2203,15 @@ a {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
   margin: 20px 0 32px;
+}
+
+/* A fixed 2 columns reads better on a phone than either the
+   auto-fill grid squeezing several columns down to illegibility, or
+   every stat stacking full-width one per row. */
+@media (max-width: 640px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .admin-stat-card {
@@ -2075,6 +2337,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 16px;
   margin-top: 24px;
   font-size: 0.9rem;

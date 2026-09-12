@@ -102,8 +102,20 @@ export default function Messages() {
     loadConversations()
   }, [loadConversations])
 
+  // Auto-select the first conversation only on a true cold landing on
+  // the bare /messages route — never again afterward, even once
+  // conversationId clears again. Without that guard this would
+  // immediately re-redirect away every time the mobile "back to list"
+  // link (or any other route to /messages) clears conversationId,
+  // defeating the whole point of a way back to the list.
+  const hasEverSelectedRef = useRef(Boolean(conversationId))
   useEffect(() => {
-    if (!conversationId && conversations.length > 0) {
+    if (conversationId) {
+      hasEverSelectedRef.current = true
+      return
+    }
+    if (conversations.length > 0 && !hasEverSelectedRef.current) {
+      hasEverSelectedRef.current = true
       navigate(`/messages/${conversations[0].id}`, { replace: true })
     }
   }, [conversationId, conversations, navigate])
@@ -347,7 +359,11 @@ export default function Messages() {
   }
 
   return (
-    <div className="messages-page">
+    <div
+      className={
+        'messages-page' + (conversationId ? ' messages-page-thread-active' : '')
+      }
+    >
       <aside className="messages-list">
         {conversations.length === 0 ? (
           <p className="inspection-empty">No conversations yet.</p>
@@ -401,6 +417,13 @@ export default function Messages() {
         ) : (
           <>
             <div className="messages-thread-header">
+              <Link
+                to="/messages"
+                className="messages-back-link"
+                aria-label="Back to messages"
+              >
+                ← Messages
+              </Link>
               {activeConversation.property.first_image && (
                 <img
                   src={activeConversation.property.first_image}
@@ -408,7 +431,7 @@ export default function Messages() {
                   className="messages-thread-thumb"
                 />
               )}
-              <div>
+              <div className="messages-thread-info">
                 <Link
                   to={`/properties/${activeConversation.property_id}`}
                   className="messages-thread-property"
