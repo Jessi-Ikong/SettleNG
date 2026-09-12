@@ -290,4 +290,211 @@ router.patch('/identity/:id', requireAdmin, async (req, res) => {
   res.json(data)
 })
 
+router.post('/property/:propertyId', upload.single('document'), async (req, res) => {
+  const { propertyId } = req.params
+
+  if (!UUID_RE.test(propertyId)) {
+    return res.status(404).json({ error: `Property ${propertyId} not found` })
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'A document file is required' })
+  }
+
+  const { data: property, error: propertyError } = await supabase
+    .from('properties')
+    .select('id, owner_id')
+    .eq('id', propertyId)
+    .maybeSingle()
+
+  if (propertyError) {
+    return res.status(500).json({ error: 'Failed to look up property' })
+  }
+  if (!property) {
+    return res.status(404).json({ error: `Property ${propertyId} not found` })
+  }
+  if (property.owner_id !== req.profile.id) {
+    return res.status(403).json({ error: 'You do not own this property' })
+  }
+
+  const { data: existingPending, error: existingError } = await supabase
+    .from('property_verifications')
+    .select('id')
+    .eq('property_id', propertyId)
+    .eq('status', 'pending')
+    .maybeSingle()
+
+  if (existingError) {
+    return res.status(500).json({ error: 'Failed to look up existing submissions' })
+  }
+  if (existingPending) {
+    return res.status(400).json({
+      error: 'This property already has a submission under review',
+    })
+  }
+
+  // Namespaced under "property/" so these never collide with identity
+  // documents (which live under "<user id>/...") in the same shared
+  // private bucket.
+  const path = `property/${propertyId}/${randomUUID()}-${req.file.originalname}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('verification-documents')
+    .upload(path, req.file.buffer, { contentType: req.file.mimetype })
+
+  if (uploadError) {
+    return res.status(500).json({ error: uploadError.message })
+  }
+
+  const { data, error } = await supabase
+    .from('property_verifications')
+    .insert({
+      property_id: propertyId,
+      submitted_by: req.profile.id,
+      document_url: path,
+      status: 'pending',
+    })
+    .select('id, status, created_at')
+    .single()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  res.status(201).json(data)
+})
+
+router.get('/property/queue', requireAdmin, async (req, res) => {
+  const { data, error } = await supabase
+    .from('property_verifications')
+    .select(
+      `
+      id, property_id, document_url, created_at,
+      property:property_id(
+        title,
+        owner:owner_id(full_name),
+        property_images(url, sort_order)
+      )
+    `,
+    )
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  const items = await Promise.all(
+    data.map(async (row) => {
+      const { data: signedUrlData } = await supabase.storage
+        .from('verification-documents')
+        .createSignedUrl(row.document_url, SIGNED_URL_TTL_SECONDS)
+
+      const images = [...(row.property?.property_images || [])].sort(
+        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
+      )
+
+      return {
+        id: row.id,
+        property_id: row.property_id,
+        property_title: row.property?.title ?? null,
+        property_first_image: images[0]?.url ?? null,
+        owner_name: row.property?.owner?.full_name ?? null,
+        document_signed_url: signedUrlData?.signedUrl ?? null,
+        created_at: row.created_at,
+      }
+    }),
+  )
+
+  res.json({ items })
+})
+
+router.get('/property/:propertyId/status', async (req, res) => {
+  const { propertyId } = req.params
+
+  if (!UUID_RE.test(propertyId)) {
+    return res.status(404).json({ error: `Property ${propertyId} not found` })
+  }
+
+  const { data: property, error: propertyError } = await supabase
+    .from('properties')
+    .select('id, owner_id')
+    .eq('id', propertyId)
+    .maybeSingle()
+
+  if (propertyError) {
+    return res.status(500).json({ error: 'Failed to look up property' })
+  }
+  if (!property) {
+    return res.status(404).json({ error: `Property ${propertyId} not found` })
+  }
+  if (property.owner_id !== req.profile.id) {
+    return res.status(403).json({ error: 'You do not own this property' })
+  }
+
+  const { data, error } = await supabase
+    .from('property_verifications')
+    .select('id, status, admin_notes, created_at')
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  res.json(data || null)
+})
+
+router.patch('/property/:id', requireAdmin, async (req, res) => {
+  const { id } = req.params
+  const { status, admin_notes: adminNotes } = req.body || {}
+
+  if (!UUID_RE.test(id)) {
+    return res.status(404).json({ error: `Submission ${id} not found` })
+  }
+  if (!['approved', 'rejected'].includes(status)) {
+    return res
+      .status(400)
+      .json({ error: 'status must be "approved" or "rejected"' })
+  }
+  if (status === 'rejected' && !adminNotes?.trim()) {
+    return res
+      .status(400)
+      .json({ error: 'admin_notes is required when rejecting' })
+  }
+
+  const { data, error } = await supabase
+    .from('property_verifications')
+    .update({
+      status,
+      admin_notes: adminNotes ? String(adminNotes).trim() : null,
+      reviewed_by: req.profile.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('id, property_id, status, admin_notes, reviewed_by, reviewed_at, created_at')
+    .maybeSingle()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+  if (!data) {
+    return res.status(404).json({ error: `Submission ${id} not found` })
+  }
+
+  if (status === 'approved') {
+    const { error: propertyError } = await supabase
+      .from('properties')
+      .update({ ownership_verified: true })
+      .eq('id', data.property_id)
+
+    if (propertyError) {
+      return res.status(500).json({ error: propertyError.message })
+    }
+  }
+
+  res.json(data)
+})
+
 export default router

@@ -1927,3 +1927,18 @@ a {
 .identity-upload-form {
   margin-top: 8px;
 }
+
+.property-verification-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 0.85rem;
+}
+
+.property-verification-row .verified-status,
+.property-verification-row .not-verified-status {
+  margin: 0;
+  font-size: inherit;
+}

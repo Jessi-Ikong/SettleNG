@@ -12,6 +12,7 @@ export const LOCATION_JOIN =
 
 export const PROPERTY_CARD_SELECT = `id, title, property_type, bedrooms, bathrooms, status, created_at,
        rent_amount, agency_fee, agreement_fee, caution_fee, service_charge, other_fee,
+       ownership_verified,
        ${LOCATION_JOIN},
        property_images(url, sort_order)`
 

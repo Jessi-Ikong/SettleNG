@@ -129,9 +129,14 @@ export default function PropertyDetail() {
           {property.owner_identity_verified && (
             <span className="badge-verified">🟢 Identity Verified</span>
           )}
-          {!property.owner_phone_verified && !property.owner_identity_verified && (
-            <span className="badge-not-verified">Not yet verified</span>
+          {property.ownership_verified && (
+            <span className="badge-verified">🟢 Property Verified</span>
           )}
+          {!property.owner_phone_verified &&
+            !property.owner_identity_verified &&
+            !property.ownership_verified && (
+              <span className="badge-not-verified">Not yet verified</span>
+            )}
           <ReviewsSummary userId={property.owner_id} />
         </div>
 

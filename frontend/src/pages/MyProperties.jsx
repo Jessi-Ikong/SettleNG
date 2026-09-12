@@ -38,6 +38,10 @@ export default function MyProperties() {
   const [loading, setLoading] = useState(true)
   const [rowErrors, setRowErrors] = useState({})
   const [busyId, setBusyId] = useState(null)
+  const [verificationStatus, setVerificationStatus] = useState({})
+  const [uploadingId, setUploadingId] = useState(null)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadSubmitting, setUploadSubmitting] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -52,10 +56,76 @@ export default function MyProperties() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
         .then((res) => res.json())
-        .then((data) => setItems(data.items))
+        .then((data) => {
+          const list = data.items || []
+          setItems(list)
+
+          const unverified = list.filter((p) => !p.ownership_verified)
+          if (unverified.length === 0) return
+
+          supabase.auth.getSession().then(({ data: { session: s } }) => {
+            Promise.all(
+              unverified.map((p) =>
+                fetch(`${API_BASE_URL}/api/verification/property/${p.id}/status`, {
+                  headers: { Authorization: `Bearer ${s.access_token}` },
+                })
+                  .then((res) => res.json())
+                  .then((status) => [p.id, status]),
+              ),
+            ).then((pairs) => {
+              setVerificationStatus(Object.fromEntries(pairs))
+            })
+          })
+        })
         .finally(() => setLoading(false))
     })
   }, [profile, authLoading])
+
+  const openUpload = (propertyId) => {
+    setUploadingId(propertyId)
+    setUploadFile(null)
+    setRowErrors((prev) => ({ ...prev, [propertyId]: '' }))
+  }
+
+  const handleUploadSubmit = async (propertyId) => {
+    if (!uploadFile) {
+      setRowErrors((prev) => ({ ...prev, [propertyId]: 'Please choose a file.' }))
+      return
+    }
+
+    setUploadSubmitting(true)
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const formData = new FormData()
+    formData.append('document', uploadFile)
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/verification/property/${propertyId}`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      },
+    )
+
+    const body = await res.json()
+    setUploadSubmitting(false)
+
+    if (!res.ok) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [propertyId]: body.error || 'Failed to submit document',
+      }))
+      return
+    }
+
+    setVerificationStatus((prev) => ({ ...prev, [propertyId]: body }))
+    setUploadingId(null)
+    setUploadFile(null)
+  }
 
   const handleStatusChange = async (propertyId, nextStatus) => {
     const previous = items
@@ -157,6 +227,87 @@ export default function MyProperties() {
                       ? formatNaira(property.move_in_cost.total)
                       : 'Move-in cost not provided'}
                   </p>
+
+                  <div className="property-verification-row">
+                    {property.ownership_verified ? (
+                      <span className="verified-status">🟢 Verified</span>
+                    ) : (
+                      (() => {
+                        const vs = verificationStatus[property.id]
+                        if (vs === undefined) return null
+                        if (!vs) {
+                          return (
+                            <>
+                              <span className="not-verified-status">
+                                Not submitted
+                              </span>
+                              <button
+                                type="button"
+                                className="btn-link"
+                                onClick={() => openUpload(property.id)}
+                              >
+                                Submit for verification
+                              </button>
+                            </>
+                          )
+                        }
+                        if (vs.status === 'pending') {
+                          return (
+                            <span className="not-verified-status">
+                              Pending review
+                            </span>
+                          )
+                        }
+                        if (vs.status === 'rejected') {
+                          return (
+                            <>
+                              <span className="not-verified-status">
+                                Rejected{vs.admin_notes ? `: "${vs.admin_notes}"` : ''}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn-link"
+                                onClick={() => openUpload(property.id)}
+                              >
+                                Resubmit
+                              </button>
+                            </>
+                          )
+                        }
+                        return null
+                      })()
+                    )}
+                  </div>
+
+                  {uploadingId === property.id && (
+                    <div className="identity-upload-form">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) =>
+                          setUploadFile(e.target.files?.[0] || null)
+                        }
+                      />
+                      <div className="inspection-request-actions">
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={uploadSubmitting}
+                          onClick={() => handleUploadSubmit(property.id)}
+                        >
+                          {uploadSubmitting ? 'Uploading...' : 'Submit'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setUploadingId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {rowErrors[property.id] && (
                     <div className="form-error">{rowErrors[property.id]}</div>
                   )}
