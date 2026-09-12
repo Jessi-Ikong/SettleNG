@@ -47,10 +47,7 @@ export default function Nav() {
             )}
           </Link>
         )}
-        {isAdmin && <Link to="/admin/reports">Admin: Reports</Link>}
-        {isAdmin && (
-          <Link to="/admin/verifications">Admin: Verifications</Link>
-        )}
+        {isAdmin && <Link to="/admin">Admin</Link>}
         {user && <Link to="/profile">Profile</Link>}
         {user ? (
           <Link to="/dashboard">Dashboard</Link>

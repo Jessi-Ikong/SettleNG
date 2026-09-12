@@ -26,6 +26,13 @@ export async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
+  if (profile.suspended) {
+    return res.status(403).json({
+      error: 'Your account has been suspended',
+      reason: profile.suspended_reason,
+    })
+  }
+
   req.user = data.user
   req.profile = profile
   next()

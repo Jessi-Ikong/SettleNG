@@ -1942,3 +1942,113 @@ a {
   margin: 0;
   font-size: inherit;
 }
+
+/* --- Admin dashboard --- */
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 20px 0 32px;
+}
+
+.admin-stat-card {
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-stat-value {
+  font-family: var(--font-headline);
+  font-weight: 800;
+  font-size: 1.75rem;
+  color: var(--color-indigo);
+}
+
+.admin-stat-label {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.admin-quicklinks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.admin-quicklink-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-decoration: none;
+  color: var(--color-indigo);
+  font-family: var(--font-headline);
+  font-weight: 700;
+}
+
+.admin-quicklink-card:hover {
+  border-color: var(--color-brass);
+}
+
+.admin-quicklink-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--color-rust);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* --- Admin users --- */
+
+.admin-users-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.admin-users-filters input[type='text'] {
+  flex: 1;
+  min-width: 200px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  border: 1px solid rgba(23, 48, 74, 0.25);
+  border-radius: 6px;
+}
+
+.admin-users-filters select {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  border: 1px solid rgba(23, 48, 74, 0.25);
+  border-radius: 6px;
+}
+
+.admin-user-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.admin-users-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  font-size: 0.9rem;
+}

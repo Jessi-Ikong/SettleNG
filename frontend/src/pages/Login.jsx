@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { suspendedMessage, clearSuspendedMessage } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -12,6 +14,7 @@ export default function Login() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
+    clearSuspendedMessage()
     setSubmitting(true)
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -34,6 +37,7 @@ export default function Login() {
       <div className="auth-card">
         <h1>Log in</h1>
 
+        {suspendedMessage && <div className="form-error">{suspendedMessage}</div>}
         {error && <div className="form-error">{error}</div>}
 
         <form onSubmit={handleSubmit}>

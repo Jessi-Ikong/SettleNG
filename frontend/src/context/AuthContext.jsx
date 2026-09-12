@@ -7,12 +7,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [suspendedMessage, setSuspendedMessage] = useState('')
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         const sessionUser = session?.user ?? null
-        setUser(sessionUser)
 
         if (sessionUser) {
           const { data } = await supabase
@@ -20,8 +20,22 @@ export function AuthProvider({ children }) {
             .select('*')
             .eq('id', sessionUser.id)
             .single()
+
+          if (data?.suspended) {
+            setSuspendedMessage(
+              `Your account has been suspended: ${data.suspended_reason || 'no reason given'}. Contact support.`,
+            )
+            setUser(null)
+            setProfile(null)
+            setLoading(false)
+            await supabase.auth.signOut()
+            return
+          }
+
+          setUser(sessionUser)
           setProfile(data ?? null)
         } else {
+          setUser(null)
           setProfile(null)
         }
 
@@ -35,9 +49,12 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signOut = () => supabase.auth.signOut()
+  const clearSuspendedMessage = () => setSuspendedMessage('')
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, signOut, suspendedMessage, clearSuspendedMessage }}
+    >
       {children}
     </AuthContext.Provider>
   )

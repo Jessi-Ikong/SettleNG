@@ -14,6 +14,8 @@ import OwnerInspections from './pages/OwnerInspections'
 import Messages from './pages/Messages'
 import AdminReports from './pages/AdminReports'
 import AdminVerifications from './pages/AdminVerifications'
+import AdminDashboard from './pages/AdminDashboard'
+import AdminUsers from './pages/AdminUsers'
 import Profile from './pages/Profile'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
@@ -105,6 +107,22 @@ function App() {
           element={
             <ProtectedRoute>
               <Messages />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute>
+              <AdminUsers />
             </ProtectedRoute>
           }
         />
