@@ -941,3 +941,41 @@ How to test this yourself:
 5. Visit /admin/audit-log after doing a few of the above actions — confirm each one shows up as a readable sentence (not raw JSON) with your name and the right details, newest first.
 
 Notes: All five throwaway accounts created for this phase's super-admin permission testing (settleng.satest.super/plain/target/tenant/super2@gmail.com) were fully deleted afterward, including nulling their reviewed_by references on the report/identity_verification rows they'd touched and deleting their admin_audit_log rows first (admin_id has a NOT NULL foreign key to profiles with no cascade, so those had to be removed before the profile itself could be deleted) — same pattern as the neighborhoods.created_by FK issue hit in earlier phases, just on a new table. The audit log is completely empty right now as a result (all of today's test entries belonged to deleted accounts) — that's expected and not a bug; it'll start filling up again the moment a real admin action happens. GET /api/admin/audit-log's admin_id embed relies on a Postgrest foreign-key join (admin:admin_id(full_name)) the same way the reports/property-verification queues already do — if an audit log row's admin were ever deleted without first deleting the row (which the app never does, but a manual dashboard deletion could), admin_name would just come back null rather than erroring, since the join is optional in that query shape.
+
+---
+Date: 2026-09-12
+Feature/Task: Merge Dashboard.jsx into Profile.jsx (remove the standalone Dashboard page)
+Files changed:
+- frontend/src/pages/Profile.jsx (edited — added `useNavigate` and pulled `signOut` off `useAuth()`; a `handleLogout` calls `signOut()` then `navigate('/login')`, identical to what Dashboard.jsx used to do. A "Log out" button (`.btn-secondary`) sits right under the existing name/role line, above the phone/identity verification sections — visible to every role including admins, since it's outside the `role !== 'admin'` block those sections are gated behind.)
+- frontend/src/pages/Dashboard.jsx (deleted — its only content, the name/role welcome line and a logout button, is now fully covered by Profile.jsx)
+- frontend/src/App.jsx (edited — removed the Dashboard import and the /dashboard route entirely; there's no catch-all `<Route path="*">` in this app, so an unmatched path like /dashboard now simply renders nothing inside `<Routes>` — just the Nav bar, no stale page and no crash)
+- frontend/src/components/Nav.jsx (edited — removed the "Dashboard" link entirely, as instructed, rather than pointing it at /profile; a logged-in user already gets a "Profile" link right next to where "Dashboard" used to be)
+- frontend/src/pages/Login.jsx (edited — post-login `navigate('/dashboard')` → `navigate('/profile')`)
+- frontend/src/pages/Register.jsx (edited — post-registration `navigate('/dashboard')` → `navigate('/profile')`)
+- frontend/src/pages/Landing.jsx (edited — not explicitly listed in the prompt, but grepping for "/dashboard" turned up a logged-in-user link here too ("Browse listings · Dashboard"); left as a dead link it would have 404'd the moment the route was removed, so updated it to point at /profile as well, consistent with everywhere else this session touched)
+
+What was tested (by Claude Code):
+- Grepped the entire frontend/src tree for "/dashboard" before making any changes, to find every reference rather than relying on memory of where it might be used — found exactly the 5 files listed above (App.jsx, Nav.jsx, Login.jsx, Register.jsx, Landing.jsx); confirmed after editing that the same grep now returns zero matches anywhere in frontend or backend source (only test.txt's own historical log entries still mention it, which is expected and correct).
+- Live in the browser as a real non-admin test account (settleng.reviewtest.tenant@gmail.com): submitted the actual Login.jsx form (not a session-injection shortcut, since the whole point was to exercise the real handleSubmit → navigate('/profile') code path) and confirmed the browser landed on /profile, not /dashboard, immediately after login — with the "Log out" button visible right under "ReviewTest Tenant — Tenant" and above the Phone/Identity verification sections. Confirmed Nav no longer shows a "Dashboard" link anywhere, logged in or out.
+- Clicked "Log out" on /profile and confirmed it signed out and redirected to /login, exactly matching Dashboard.jsx's old behavior.
+- Visited /dashboard directly both logged out and logged back in again afterward — confirmed both times it renders nothing but the Nav bar (no stale "Welcome, ..." content, no crash, no console error), since the route no longer exists in App.jsx's `<Routes>`.
+- Confirmed Landing.jsx's logged-in view now reads "Browse listings · Profile" instead of "Browse listings · Dashboard", and that link is live (not dead).
+- Checked the browser console throughout this entire sequence (login, profile view, logout, /dashboard visits, landing page) — zero errors or warnings.
+- Note for future browser-driven testing in this environment: the automation tool's element-ref clicks on the Login "Log in" submit button and Profile's "Log out" button both silently failed to register (the page didn't change, no network request fired) on the first attempt each; both were confirmed to work correctly by dispatching a real `.click()` via JavaScript instead, which is the same click-targeting quirk already noted in the previous phase's admin/locations toggle testing — not an app bug.
+
+Expected result:
+- Profile.jsx now does everything Dashboard.jsx used to do (name/role display + logout) plus the phone/identity verification sections it already had. Logging in or registering lands on /profile. Nav has no "Dashboard" link. /dashboard shows no page content (not a broken/stale render) whether logged in or out.
+
+Actual result:
+- Matches expected.
+
+Status: PASS
+
+How to test this yourself:
+1. Log out if needed, then log in with any existing account — confirm you land on /profile, not /dashboard, and that the page shows your name/role plus a "Log out" button near the top (above the verification sections, if you're not an admin).
+2. Click "Log out" from /profile — confirm it signs you out and sends you to /login.
+3. While logged out, visit http://localhost:5173/dashboard directly — confirm it shows just the site nav with no page content below it (not a blank white error page, not stale "Welcome, ..." text). Log back in and visit /dashboard again — confirm the same empty result even while authenticated.
+4. Check the site nav (logged in and logged out) — confirm there's no "Dashboard" link anywhere; a logged-in user should see "Profile" where "Dashboard" used to sit.
+5. Register a brand-new account — confirm it also lands on /profile immediately after signup, not /dashboard.
+
+Notes: No throwaway accounts were created this phase — testing reused the existing settleng.reviewtest.tenant@gmail.com fixture account, nothing to clean up.

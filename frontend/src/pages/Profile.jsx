@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { API_BASE_URL } from '../lib/api'
@@ -10,7 +11,8 @@ const IDENTITY_STATUS_META = {
 }
 
 export default function Profile() {
-  const { profile, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
+  const { profile, loading: authLoading, signOut } = useAuth()
 
   const [phoneVerified, setPhoneVerified] = useState(false)
   const [otpRequested, setOtpRequested] = useState(false)
@@ -138,6 +140,11 @@ export default function Profile() {
     setIdentityStatus(body)
   }
 
+  const handleLogout = async () => {
+    await signOut()
+    navigate('/login')
+  }
+
   if (authLoading) {
     return <div className="page-loading">Loading...</div>
   }
@@ -153,6 +160,9 @@ export default function Profile() {
         <p className="profile-name">
           {profile?.full_name} — <span>{profile?.role}</span>
         </p>
+        <button type="button" className="btn-secondary" onClick={handleLogout}>
+          Log out
+        </button>
 
         {profile?.role !== 'admin' && (
           <>

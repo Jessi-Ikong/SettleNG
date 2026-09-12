@@ -36,7 +36,7 @@ export default function Register() {
       return
     }
 
-    navigate('/dashboard')
+    navigate('/profile')
   }
 
   return (

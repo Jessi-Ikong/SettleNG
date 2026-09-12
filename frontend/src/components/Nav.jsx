@@ -49,9 +49,7 @@ export default function Nav() {
         )}
         {isAdmin && <Link to="/admin">Admin</Link>}
         {user && <Link to="/profile">Profile</Link>}
-        {user ? (
-          <Link to="/dashboard">Dashboard</Link>
-        ) : (
+        {!user && (
           <>
             <Link to="/login">Log in</Link>
             <Link to="/register">Register</Link>

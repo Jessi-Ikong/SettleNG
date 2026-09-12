@@ -29,7 +29,7 @@ export default function Login() {
       return
     }
 
-    navigate('/dashboard')
+    navigate('/profile')
   }
 
   return (
