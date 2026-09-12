@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { logAdminAction } from '../lib/auditLog.js'
 
 const router = Router()
 
@@ -189,6 +190,12 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'A valid status is required' })
   }
 
+  const { data: previous } = await supabase
+    .from('reports')
+    .select('status')
+    .eq('id', id)
+    .maybeSingle()
+
   const { data, error } = await supabase
     .from('reports')
     .update({
@@ -207,6 +214,14 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (!data) {
     return res.status(404).json({ error: `Report ${id} not found` })
   }
+
+  await logAdminAction(supabase, {
+    adminId: req.profile.id,
+    action: 'report.status_change',
+    targetType: 'report',
+    targetId: id,
+    details: { old_status: previous?.status ?? null, new_status: status, admin_notes: adminNotes ?? null },
+  })
 
   const targetMeta = await resolveTargetMeta(data.target_type, data.target_id)
 

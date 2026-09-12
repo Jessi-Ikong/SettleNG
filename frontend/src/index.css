@@ -2044,6 +2044,33 @@ a {
   margin: 4px 0;
 }
 
+.admin-user-restricted-note {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  margin: 4px 0 0;
+}
+
+/* --- Admin locations --- */
+
+.admin-locations-count {
+  font-weight: 500;
+  margin: 20px 0;
+}
+
+.admin-state-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.admin-state-warning {
+  font-size: 0.8rem;
+  color: var(--color-rust);
+  margin: 8px 0 0;
+}
+
 .admin-users-pagination {
   display: flex;
   align-items: center;

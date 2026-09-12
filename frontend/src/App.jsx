@@ -16,6 +16,8 @@ import AdminReports from './pages/AdminReports'
 import AdminVerifications from './pages/AdminVerifications'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminUsers from './pages/AdminUsers'
+import AdminLocations from './pages/AdminLocations'
+import AdminAuditLog from './pages/AdminAuditLog'
 import Profile from './pages/Profile'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
@@ -123,6 +125,22 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminUsers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/locations"
+          element={
+            <ProtectedRoute>
+              <AdminLocations />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/audit-log"
+          element={
+            <ProtectedRoute>
+              <AdminAuditLog />
             </ProtectedRoute>
           }
         />

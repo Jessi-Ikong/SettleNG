@@ -105,6 +105,12 @@ export default function AdminDashboard() {
         <Link to="/admin/users" className="admin-quicklink-card">
           <span className="admin-quicklink-title">Users</span>
         </Link>
+        <Link to="/admin/locations" className="admin-quicklink-card">
+          <span className="admin-quicklink-title">Locations</span>
+        </Link>
+        <Link to="/admin/audit-log" className="admin-quicklink-card">
+          <span className="admin-quicklink-title">Audit Log</span>
+        </Link>
       </div>
     </div>
   )

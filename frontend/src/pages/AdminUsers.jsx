@@ -200,6 +200,9 @@ export default function AdminUsers() {
                   <span className="admin-report-reason">{u.email}</span>
                   <span className="admin-user-badges">
                     <span className="status-badge status-rented">{u.role}</span>
+                    {u.is_super_admin && (
+                      <span className="status-badge status-pending">Super admin</span>
+                    )}
                     {u.phone_verified && (
                       <span className="badge-verified">🟢 Phone</span>
                     )}
@@ -227,7 +230,12 @@ export default function AdminUsers() {
                 <div className="form-error">{rowErrors[u.id]}</div>
               )}
 
-              {u.id === profile.id ? null : suspendingId === u.id ? (
+              {u.id === profile.id ? null : u.role === 'admin' &&
+                !profile.is_super_admin ? (
+                <p className="admin-user-restricted-note">
+                  Only a super admin can suspend another admin account.
+                </p>
+              ) : suspendingId === u.id ? (
                 <div className="inspection-action-form">
                   <textarea
                     placeholder="Reason for suspending (required)"

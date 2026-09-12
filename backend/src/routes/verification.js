@@ -3,6 +3,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { logAdminAction } from '../lib/auditLog.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -287,6 +288,14 @@ router.patch('/identity/:id', requireAdmin, async (req, res) => {
     }
   }
 
+  await logAdminAction(supabase, {
+    adminId: req.profile.id,
+    action: status === 'approved' ? 'identity_verification.approve' : 'identity_verification.reject',
+    targetType: 'identity_verification',
+    targetId: id,
+    details: { user_id: data.user_id, admin_notes: data.admin_notes },
+  })
+
   res.json(data)
 })
 
@@ -493,6 +502,14 @@ router.patch('/property/:id', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: propertyError.message })
     }
   }
+
+  await logAdminAction(supabase, {
+    adminId: req.profile.id,
+    action: status === 'approved' ? 'property_verification.approve' : 'property_verification.reject',
+    targetType: 'property_verification',
+    targetId: id,
+    details: { property_id: data.property_id, admin_notes: data.admin_notes },
+  })
 
   res.json(data)
 })
