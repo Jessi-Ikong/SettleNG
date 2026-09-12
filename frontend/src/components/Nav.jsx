@@ -8,6 +8,7 @@ export default function Nav() {
   const location = useLocation()
   const canList = profile && ['landlord', 'agent'].includes(profile.role)
   const isAdmin = profile?.role === 'admin'
+  const showHome = profile && ['tenant', 'landlord', 'agent'].includes(profile.role)
   const [unreadCount, setUnreadCount] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const navRef = useRef(null)
@@ -74,6 +75,11 @@ export default function Nav() {
         <Link to="/properties" onClick={closeMenu}>
           Browse
         </Link>
+        {showHome && (
+          <Link to="/home" onClick={closeMenu}>
+            Home
+          </Link>
+        )}
         {canList && (
           <Link to="/create-property" onClick={closeMenu}>
             List a property

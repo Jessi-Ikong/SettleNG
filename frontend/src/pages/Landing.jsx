@@ -18,7 +18,7 @@ const LANDLORD_STEPS = [
 ]
 
 export default function Landing() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [listings, setListings] = useState([])
   const [listingsLoaded, setListingsLoaded] = useState(false)
   const [favoritedIds, setFavoritedIds] = useState(new Set())
@@ -58,6 +58,14 @@ export default function Landing() {
             List a property
           </Link>
         </div>
+
+        {user && (
+          <p className="landing-dashboard-link auth-switch">
+            <Link to={profile?.role === 'admin' ? '/admin' : '/home'}>
+              Go to your dashboard
+            </Link>
+          </p>
+        )}
       </section>
 
       {listingsLoaded && listings.length > 0 && (

@@ -36,7 +36,10 @@ export default function Register() {
       return
     }
 
-    navigate('/profile')
+    // Self-registration only ever creates tenant/landlord/agent
+    // accounts (see the role select below) — admins are promoted
+    // separately, never created here — so this always goes to /home.
+    navigate('/home')
   }
 
   return (

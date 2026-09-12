@@ -17,10 +17,8 @@ export default function Login() {
     clearSuspendedMessage()
     setSubmitting(true)
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { data: signInData, error: signInError } =
+      await supabase.auth.signInWithPassword({ email, password })
 
     setSubmitting(false)
 
@@ -29,7 +27,17 @@ export default function Login() {
       return
     }
 
-    navigate('/profile')
+    // Read the role straight from the database rather than the
+    // AuthContext's profile state, which may not have finished
+    // loading yet at this exact moment — this mirrors AuthContext's
+    // own profile fetch, just narrowed to the one field we need.
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', signInData.user.id)
+      .single()
+
+    navigate(profileRow?.role === 'admin' ? '/admin' : '/home')
   }
 
   return (
