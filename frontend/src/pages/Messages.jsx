@@ -76,9 +76,23 @@ export default function Messages() {
     const {
       data: { session },
     } = await supabase.auth.getSession()
+
+    if (!session) {
+      setConversations([])
+      setLoadingList(false)
+      return
+    }
+
     const res = await fetch(`${API_BASE_URL}/api/conversations`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
+
+    if (!res.ok) {
+      setConversations([])
+      setLoadingList(false)
+      return
+    }
+
     const data = await res.json()
     setConversations(data.items)
     setLoadingList(false)
