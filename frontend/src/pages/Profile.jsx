@@ -154,125 +154,129 @@ export default function Profile() {
           {profile?.full_name} — <span>{profile?.role}</span>
         </p>
 
-        <section className="profile-section">
-          <h2>Phone verification</h2>
+        {profile?.role !== 'admin' && (
+          <>
+            <section className="profile-section">
+              <h2>Phone verification</h2>
 
-          {phoneVerified ? (
-            <p className="verified-status">🟢 Verified</p>
-          ) : (
-            <>
-              <p className="not-verified-status">Not verified</p>
-
-              {phoneError && <div className="form-error">{phoneError}</div>}
-
-              {!otpRequested ? (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={handleSendCode}
-                  disabled={phoneSubmitting}
-                >
-                  {phoneSubmitting ? 'Sending...' : 'Send code'}
-                </button>
+              {phoneVerified ? (
+                <p className="verified-status">🟢 Verified</p>
               ) : (
                 <>
-                  <div className="dev-code-box">
-                    <p className="dev-code-note">
-                      SMS isn't connected yet — this code would normally be
-                      texted to you.
-                    </p>
-                    <p className="dev-code-value">{devCode}</p>
-                  </div>
+                  <p className="not-verified-status">Not verified</p>
 
-                  <form className="otp-confirm-form" onSubmit={handleConfirmCode}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder="6-digit code"
-                      value={codeInput}
-                      onChange={(e) => setCodeInput(e.target.value)}
-                    />
+                  {phoneError && <div className="form-error">{phoneError}</div>}
+
+                  {!otpRequested ? (
                     <button
-                      type="submit"
+                      type="button"
                       className="btn-primary"
-                      disabled={phoneSubmitting || codeInput.length !== 6}
+                      onClick={handleSendCode}
+                      disabled={phoneSubmitting}
                     >
-                      {phoneSubmitting ? 'Confirming...' : 'Confirm'}
+                      {phoneSubmitting ? 'Sending...' : 'Send code'}
                     </button>
-                  </form>
+                  ) : (
+                    <>
+                      <div className="dev-code-box">
+                        <p className="dev-code-note">
+                          SMS isn't connected yet — this code would normally be
+                          texted to you.
+                        </p>
+                        <p className="dev-code-value">{devCode}</p>
+                      </div>
 
-                  <button
-                    type="button"
-                    className="btn-link"
-                    onClick={handleSendCode}
-                    disabled={phoneSubmitting}
-                  >
-                    Send a new code
-                  </button>
+                      <form className="otp-confirm-form" onSubmit={handleConfirmCode}>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder="6-digit code"
+                          value={codeInput}
+                          onChange={(e) => setCodeInput(e.target.value)}
+                        />
+                        <button
+                          type="submit"
+                          className="btn-primary"
+                          disabled={phoneSubmitting || codeInput.length !== 6}
+                        >
+                          {phoneSubmitting ? 'Confirming...' : 'Confirm'}
+                        </button>
+                      </form>
+
+                      <button
+                        type="button"
+                        className="btn-link"
+                        onClick={handleSendCode}
+                        disabled={phoneSubmitting}
+                      >
+                        Send a new code
+                      </button>
+                    </>
+                  )}
                 </>
               )}
-            </>
-          )}
-        </section>
+            </section>
 
-        <section className="profile-section">
-          <h2>Identity verification</h2>
+            <section className="profile-section">
+              <h2>Identity verification</h2>
 
-          {identityLoading ? (
-            <p className="inspection-empty">Loading...</p>
-          ) : !identityStatus ? (
-            <p className="not-verified-status">Not submitted</p>
-          ) : (
-            <>
-              <p
-                className={
-                  identityStatus.status === 'approved'
-                    ? 'verified-status'
-                    : 'not-verified-status'
-                }
-              >
-                {identityStatus.status === 'approved' && '🟢 '}
-                {IDENTITY_STATUS_META[identityStatus.status] ||
-                  identityStatus.status}
-              </p>
-              {identityStatus.status === 'rejected' &&
-                identityStatus.admin_notes && (
-                  <p className="inspection-note">
-                    Reason: "{identityStatus.admin_notes}"
+              {identityLoading ? (
+                <p className="inspection-empty">Loading...</p>
+              ) : !identityStatus ? (
+                <p className="not-verified-status">Not submitted</p>
+              ) : (
+                <>
+                  <p
+                    className={
+                      identityStatus.status === 'approved'
+                        ? 'verified-status'
+                        : 'not-verified-status'
+                    }
+                  >
+                    {identityStatus.status === 'approved' && '🟢 '}
+                    {IDENTITY_STATUS_META[identityStatus.status] ||
+                      identityStatus.status}
                   </p>
-                )}
-            </>
-          )}
-
-          {canSubmitIdentity && (
-            <form className="identity-upload-form" onSubmit={handleIdentitySubmit}>
-              {identityError && (
-                <div className="form-error">{identityError}</div>
+                  {identityStatus.status === 'rejected' &&
+                    identityStatus.admin_notes && (
+                      <p className="inspection-note">
+                        Reason: "{identityStatus.admin_notes}"
+                      </p>
+                    )}
+                </>
               )}
-              <div className="form-field">
-                <label htmlFor="identity-document">
-                  {identityStatus?.status === 'rejected'
-                    ? 'Resubmit a document'
-                    : 'Upload a government-issued ID'}
-                </label>
-                <input
-                  id="identity-document"
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => setIdentityFile(e.target.files?.[0] || null)}
-                />
-              </div>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={identitySubmitting}
-              >
-                {identitySubmitting ? 'Uploading...' : 'Submit for review'}
-              </button>
-            </form>
-          )}
-        </section>
+
+              {canSubmitIdentity && (
+                <form className="identity-upload-form" onSubmit={handleIdentitySubmit}>
+                  {identityError && (
+                    <div className="form-error">{identityError}</div>
+                  )}
+                  <div className="form-field">
+                    <label htmlFor="identity-document">
+                      {identityStatus?.status === 'rejected'
+                        ? 'Resubmit a document'
+                        : 'Upload a government-issued ID'}
+                    </label>
+                    <input
+                      id="identity-document"
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setIdentityFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={identitySubmitting}
+                  >
+                    {identitySubmitting ? 'Uploading...' : 'Submit for review'}
+                  </button>
+                </form>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </div>
   )
