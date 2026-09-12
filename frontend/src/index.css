@@ -159,18 +159,6 @@ a {
   text-align: center;
 }
 
-.placeholder-screen {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  background: var(--color-bg);
-  text-align: center;
-  padding: 24px;
-}
-
 .wordmark {
   font-family: var(--font-headline);
   font-weight: 900;
@@ -2341,4 +2329,142 @@ a {
   gap: 16px;
   margin-top: 24px;
   font-size: 0.9rem;
+}
+
+/* --- Landing page --- */
+
+.landing-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+.landing-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.landing-hero-ctas {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 8px;
+}
+
+.landing-cta {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 1.05rem;
+  min-height: 44px;
+  padding: 14px 20px;
+  border-radius: 6px;
+}
+
+.landing-cta-primary {
+  background: var(--color-brass);
+  color: #fff;
+  border: none;
+}
+
+.landing-cta-primary:hover {
+  opacity: 0.92;
+}
+
+.landing-cta-secondary {
+  background: transparent;
+  color: var(--color-indigo);
+  border: 1px solid var(--color-indigo);
+}
+
+.landing-section {
+  padding: 40px 0;
+  border-top: 1px solid rgba(23, 48, 74, 0.1);
+}
+
+.landing-section h2 {
+  margin: 0 0 4px;
+}
+
+.landing-browse-all {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.how-it-works-columns {
+  display: flex;
+  gap: 48px;
+}
+
+.how-it-works-column {
+  flex: 1;
+  min-width: 0;
+}
+
+.how-it-works-column h3 {
+  font-size: 1.1rem;
+  margin: 0 0 16px;
+}
+
+.how-it-works-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.how-it-works-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.how-it-works-step-number {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-brass);
+  color: #fff;
+  font-family: var(--font-headline);
+  font-weight: 800;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.how-it-works-step-label {
+  font-weight: 500;
+}
+
+.landing-trust-line {
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--color-ink);
+  opacity: 0.75;
+  padding-top: 32px;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .landing-hero-ctas {
+    flex-direction: column;
+  }
+
+  .how-it-works-columns {
+    flex-direction: column;
+    gap: 32px;
+  }
 }

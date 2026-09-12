@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { fetchFavoritedIds } from '../lib/favoritesApi'
 import SearchFilters from '../components/SearchFilters'
-import FavoriteButton from '../components/FavoriteButton'
-
-function formatNaira(amount) {
-  return `₦${Number(amount).toLocaleString('en-NG')}`
-}
+import PropertyCard from '../components/PropertyCard'
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -251,42 +247,11 @@ export default function PropertyList() {
           ) : (
             <div className="property-card-grid">
               {result.items.map((property) => (
-                <Link
+                <PropertyCard
                   key={property.id}
-                  to={`/properties/${property.id}`}
-                  className="property-card"
-                >
-                  <div className="property-card-media">
-                    {property.first_image ? (
-                      <img
-                        src={property.first_image}
-                        alt={property.title}
-                        className="property-card-image"
-                      />
-                    ) : (
-                      <div className="property-card-image property-card-image-empty">
-                        No photo
-                      </div>
-                    )}
-                    <FavoriteButton
-                      propertyId={property.id}
-                      initialFavorited={favoritedIds.has(property.id)}
-                    />
-                  </div>
-                  <div className="property-card-body">
-                    <span className="badge-available">{property.status}</span>
-                    <h3>{property.title}</h3>
-                    <p className="property-card-location">
-                      {property.neighborhood.name}, {property.ward.lga.name},{' '}
-                      {property.ward.lga.state.name}
-                    </p>
-                    <p className="property-card-cost">
-                      {property.move_in_cost.total != null
-                        ? formatNaira(property.move_in_cost.total)
-                        : 'Move-in cost not provided'}
-                    </p>
-                  </div>
-                </Link>
+                  property={property}
+                  favorited={favoritedIds.has(property.id)}
+                />
               ))}
             </div>
           )}
