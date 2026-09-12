@@ -14,13 +14,6 @@ const OTP_TTL_MS = 10 * 60 * 1000
 const MAX_OTP_ATTEMPTS = 5
 const SIGNED_URL_TTL_SECONDS = 300
 
-// Failed-attempt counters, keyed by phone_otps.id. There's no
-// "attempts" column in the 011_verification.sql schema as given, so
-// this tracks it in memory for the life of the process — fine for a
-// 10-minute-lived OTP row, but it resets on a server restart. Move
-// this to a persisted column if that becomes a real problem.
-const otpAttempts = new Map()
-
 function requireAdmin(req, res, next) {
   if (req.profile.role !== 'admin') {
     return res.status(403).json({ error: 'Admins only' })
@@ -61,8 +54,6 @@ router.post('/phone/request', async (req, res) => {
     return res.status(500).json({ error: error.message })
   }
 
-  otpAttempts.delete(data.id)
-
   // dev_code is a stand-in for the real SMS provider we don't have
   // yet — it lets the frontend show the code directly instead of
   // texting it. Once a real provider is wired in, this response
@@ -84,7 +75,7 @@ router.post('/phone/confirm', async (req, res) => {
 
   const { data: otp, error: otpError } = await supabase
     .from('phone_otps')
-    .select('id, code, expires_at')
+    .select('id, code, expires_at, attempts')
     .eq('user_id', req.profile.id)
     .is('verified_at', null)
     .gt('expires_at', new Date().toISOString())
@@ -102,23 +93,28 @@ router.post('/phone/confirm', async (req, res) => {
   }
 
   if (String(code).trim() !== otp.code) {
-    const attempts = (otpAttempts.get(otp.id) || 0) + 1
+    const attempts = otp.attempts + 1
 
     if (attempts >= MAX_OTP_ATTEMPTS) {
-      otpAttempts.delete(otp.id)
       await supabase.from('phone_otps').delete().eq('id', otp.id)
       return res.status(400).json({
         error: 'Too many incorrect attempts — please request a new code',
       })
     }
 
-    otpAttempts.set(otp.id, attempts)
+    const { error: attemptsError } = await supabase
+      .from('phone_otps')
+      .update({ attempts })
+      .eq('id', otp.id)
+
+    if (attemptsError) {
+      return res.status(500).json({ error: attemptsError.message })
+    }
+
     return res.status(400).json({
       error: `Incorrect code — ${MAX_OTP_ATTEMPTS - attempts} attempt(s) remaining`,
     })
   }
-
-  otpAttempts.delete(otp.id)
 
   const { error: verifyError } = await supabase
     .from('phone_otps')
