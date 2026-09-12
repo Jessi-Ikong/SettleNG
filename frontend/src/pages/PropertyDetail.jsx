@@ -109,7 +109,6 @@ export default function PropertyDetail() {
       <div className="property-detail-card">
         <div className="property-detail-header">
           <h1>{property.title}</h1>
-          <span className="badge-not-verified">Not yet verified</span>
           {property.status !== 'available' && (
             <span className="badge-draft">{property.status}</span>
           )}
@@ -124,6 +123,15 @@ export default function PropertyDetail() {
           <p className="property-owner-name">
             Owner: {property.owner_name || 'Unknown'}
           </p>
+          {property.owner_phone_verified && (
+            <span className="badge-verified">🟢 Phone Verified</span>
+          )}
+          {property.owner_identity_verified && (
+            <span className="badge-verified">🟢 Identity Verified</span>
+          )}
+          {!property.owner_phone_verified && !property.owner_identity_verified && (
+            <span className="badge-not-verified">Not yet verified</span>
+          )}
           <ReviewsSummary userId={property.owner_id} />
         </div>
 

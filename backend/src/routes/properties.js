@@ -495,7 +495,7 @@ router.get('/:id', async (req, res) => {
   const { data: property, error } = await supabase
     .from('properties')
     .select(
-      `*, ${LOCATION_JOIN}, property_images(id, url, sort_order), owner:owner_id(full_name)`,
+      `*, ${LOCATION_JOIN}, property_images(id, url, sort_order), owner:owner_id(full_name, phone_verified, identity_verified)`,
     )
     .eq('id', id)
     .maybeSingle()
@@ -547,6 +547,8 @@ router.get('/:id', async (req, res) => {
     // prospective tenant can see who they'd be dealing with and look
     // up that landlord's reviews — the whole point of this field.
     owner_name: owner?.full_name ?? null,
+    owner_phone_verified: owner?.phone_verified ?? false,
+    owner_identity_verified: owner?.identity_verified ?? false,
   })
 })
 

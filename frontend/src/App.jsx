@@ -13,6 +13,8 @@ import TenantInspections from './pages/TenantInspections'
 import OwnerInspections from './pages/OwnerInspections'
 import Messages from './pages/Messages'
 import AdminReports from './pages/AdminReports'
+import AdminVerifications from './pages/AdminVerifications'
+import Profile from './pages/Profile'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -111,6 +113,22 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminReports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/verifications"
+          element={
+            <ProtectedRoute>
+              <AdminVerifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

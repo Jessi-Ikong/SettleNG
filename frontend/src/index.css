@@ -433,6 +433,16 @@ a {
   text-transform: uppercase;
 }
 
+.badge-verified {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-success);
+  color: var(--color-success);
+}
+
 .property-type-label {
   color: var(--color-ink);
   opacity: 0.7;
@@ -1679,8 +1689,9 @@ a {
 
 .property-owner-block {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin: 8px 0;
 }
 
@@ -1816,4 +1827,103 @@ a {
   margin: 0;
   font-style: italic;
   opacity: 0.85;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-indigo);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.btn-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Profile / verification --- */
+
+.profile-card {
+  max-width: 520px;
+}
+
+.profile-name {
+  margin: 0 0 24px;
+  opacity: 0.75;
+}
+
+.profile-name span {
+  text-transform: capitalize;
+}
+
+.profile-section {
+  padding: 20px 0;
+  border-top: 1px solid rgba(23, 48, 74, 0.1);
+}
+
+.profile-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.profile-section h2 {
+  font-size: 1.1rem;
+  margin: 0 0 10px;
+}
+
+.verified-status {
+  color: var(--color-success);
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.not-verified-status {
+  opacity: 0.65;
+  margin: 0 0 12px;
+}
+
+.dev-code-box {
+  background: var(--bg-success);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.dev-code-note {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  color: var(--color-success);
+}
+
+.dev-code-value {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--color-success);
+}
+
+.otp-confirm-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.otp-confirm-form input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  padding: 10px 14px;
+  border: 1px solid rgba(23, 48, 74, 0.25);
+  border-radius: 8px;
+}
+
+.identity-upload-form {
+  margin-top: 8px;
 }
