@@ -20,6 +20,8 @@ import AdminLocations from './pages/AdminLocations'
 import AdminAuditLog from './pages/AdminAuditLog'
 import Profile from './pages/Profile'
 import TenancyHistory from './pages/TenancyHistory'
+import BuildingDetail from './pages/BuildingDetail'
+import MyBuildings from './pages/MyBuildings'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -174,6 +176,15 @@ function App() {
           element={
             <ProtectedRoute>
               <TenancyHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/buildings/:id" element={<BuildingDetail />} />
+        <Route
+          path="/my-buildings"
+          element={
+            <ProtectedRoute>
+              <MyBuildings />
             </ProtectedRoute>
           }
         />

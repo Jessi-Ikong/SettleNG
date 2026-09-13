@@ -90,6 +90,11 @@ export default function Nav() {
             My Properties
           </Link>
         )}
+        {canList && (
+          <Link to="/my-buildings" onClick={closeMenu}>
+            My Buildings
+          </Link>
+        )}
         {user && (
           <Link to="/saved-properties" onClick={closeMenu}>
             Saved Properties

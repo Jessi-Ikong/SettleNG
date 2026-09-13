@@ -3,6 +3,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { findOrCreateNeighborhood } from '../lib/neighborhoods.js'
 import {
   PRICING_FIELDS,
   LOCATION_JOIN,
@@ -40,46 +41,6 @@ function toNullableNumber(value) {
 function toNullableInt(value) {
   const num = toNullableNumber(value)
   return num === null ? null : Math.trunc(num)
-}
-
-async function findOrCreateNeighborhood(wardId, name, createdBy) {
-  const trimmed = name.trim()
-
-  const { data: existing, error: findError } = await supabase
-    .from('neighborhoods')
-    .select('id')
-    .eq('ward_id', wardId)
-    .ilike('name', trimmed)
-    .maybeSingle()
-
-  if (findError) {
-    throw new Error(`Failed to look up neighborhood: ${findError.message}`)
-  }
-
-  if (existing) return existing.id
-
-  const { data: created, error: createError } = await supabase
-    .from('neighborhoods')
-    .insert({ ward_id: wardId, name: trimmed, created_by: createdBy })
-    .select('id')
-    .single()
-
-  if (createError) {
-    // Race: someone else created the same (ward_id, name) between our
-    // select and insert — fall back to re-selecting it.
-    if (createError.code === '23505') {
-      const { data: retry } = await supabase
-        .from('neighborhoods')
-        .select('id')
-        .eq('ward_id', wardId)
-        .ilike('name', trimmed)
-        .maybeSingle()
-      if (retry) return retry.id
-    }
-    throw new Error(`Failed to create neighborhood: ${createError.message}`)
-  }
-
-  return created.id
 }
 
 function buildPropertyPayload(body) {
@@ -220,12 +181,54 @@ router.post('/', requireAuth, async (req, res) => {
       .json({ error: 'neighborhood_id or neighborhood_name is required' })
   }
 
+  // Assigning a unit to a building is optional — leaving building_id
+  // out keeps this identical to a standalone self-con/one-room
+  // listing. When it IS set, unit_label becomes required (this
+  // doubles the DB check constraint at the application layer so the
+  // error is a clean 400, not a raw Postgres constraint violation),
+  // and the building must actually belong to this landlord/agent.
+  let buildingId = null
+  let unitLabel = null
+  if (body.building_id) {
+    if (!UUID_RE.test(body.building_id)) {
+      return res.status(400).json({ error: 'A valid building_id is required' })
+    }
+    if (!body.unit_label || !String(body.unit_label).trim()) {
+      return res
+        .status(400)
+        .json({ error: 'unit_label is required when building_id is set' })
+    }
+
+    const { data: building, error: buildingError } = await supabase
+      .from('buildings')
+      .select('id, owner_id')
+      .eq('id', body.building_id)
+      .maybeSingle()
+
+    if (buildingError) {
+      return res.status(500).json({ error: 'Failed to look up building' })
+    }
+    if (!building) {
+      return res
+        .status(400)
+        .json({ error: `Building ${body.building_id} not found` })
+    }
+    if (building.owner_id !== req.profile.id) {
+      return res.status(403).json({ error: 'You do not own this building' })
+    }
+
+    buildingId = body.building_id
+    unitLabel = String(body.unit_label).trim()
+  }
+
   const payload = {
     ...buildPropertyPayload(body),
     ward_id: wardId,
     neighborhood_id: neighborhoodId,
     owner_id: req.profile.id,
     status: 'draft',
+    building_id: buildingId,
+    unit_label: unitLabel,
   }
 
   const { data, error } = await supabase
@@ -565,7 +568,7 @@ router.get('/:id', async (req, res) => {
   const { data: property, error } = await supabase
     .from('properties')
     .select(
-      `*, ${LOCATION_JOIN}, property_images(id, url, sort_order), owner:owner_id(full_name, phone_verified, identity_verified)`,
+      `*, ${LOCATION_JOIN}, property_images(id, url, sort_order), owner:owner_id(full_name, phone_verified, identity_verified), building:building_id(id, name)`,
     )
     .eq('id', id)
     .maybeSingle()
@@ -607,7 +610,7 @@ router.get('/:id', async (req, res) => {
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
   )
 
-  const { owner, ...propertyFields } = property
+  const { owner, building, ...propertyFields } = property
 
   // The tenant-assignment picker on "Mark as rented" needs this list
   // while the property is still 'available' (about to be rented), and
@@ -647,6 +650,7 @@ router.get('/:id', async (req, res) => {
     owner_name: owner?.full_name ?? null,
     owner_phone_verified: owner?.phone_verified ?? false,
     owner_identity_verified: owner?.identity_verified ?? false,
+    building_name: building?.name ?? null,
     ...(eligibleTenants ? { eligible_tenants: eligibleTenants } : {}),
   })
 })

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import FavoriteButton from './FavoriteButton'
 
 function formatNaira(amount) {
@@ -6,6 +6,7 @@ function formatNaira(amount) {
 }
 
 export default function PropertyCard({ property, favorited, onToggleFavorite }) {
+  const navigate = useNavigate()
   const unavailable = property.status !== 'available'
 
   return (
@@ -37,7 +38,23 @@ export default function PropertyCard({ property, favorited, onToggleFavorite }) 
         ) : (
           <span className="badge-available">{property.status}</span>
         )}
+        {property.unit_label && (
+          <span className="badge-unit-label">Unit {property.unit_label}</span>
+        )}
         <h3>{property.title}</h3>
+        {property.building_id && (
+          <button
+            type="button"
+            className="property-card-building-link"
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              navigate(`/buildings/${property.building_id}`)
+            }}
+          >
+            Part of {property.building_name}
+          </button>
+        )}
         <p className="property-card-location">
           {property.neighborhood.name}, {property.ward.lga.name},{' '}
           {property.ward.lga.state.name}

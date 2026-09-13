@@ -121,6 +121,16 @@ export default function PropertyDetail() {
           <ReportButton targetType="property" targetId={property.id} />
         </div>
 
+        {property.building_id && (
+          <p className="property-building-context">
+            Part of{' '}
+            <Link to={`/buildings/${property.building_id}`}>
+              {property.building_name}
+            </Link>
+            {property.unit_label && ` — Unit ${property.unit_label}`}
+          </p>
+        )}
+
         <div className="property-owner-block">
           <p className="property-owner-name">
             Owner: {property.owner_name || 'Unknown'}

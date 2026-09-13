@@ -12,7 +12,8 @@ export const LOCATION_JOIN =
 
 export const PROPERTY_CARD_SELECT = `id, title, property_type, bedrooms, bathrooms, status, created_at,
        rent_amount, agency_fee, agreement_fee, caution_fee, service_charge, other_fee,
-       ownership_verified,
+       ownership_verified, building_id, unit_label,
+       building:building_id(name),
        ${LOCATION_JOIN},
        property_images(url, sort_order)`
 
@@ -42,10 +43,11 @@ export function toPropertyCard(property) {
   const images = [...(property.property_images || [])].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
   )
-  const { property_images, ...rest } = property
+  const { property_images, building, ...rest } = property
   return {
     ...rest,
     first_image: images[0]?.url ?? null,
     move_in_cost: computeMoveInCost(property),
+    building_name: building?.name ?? null,
   }
 }
