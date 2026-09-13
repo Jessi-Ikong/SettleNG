@@ -11,6 +11,7 @@ import ReportButton from '../components/ReportButton'
 import PropertyListingDetail from '../components/PropertyListingDetail'
 import ReviewsSummary from '../components/ReviewsSummary'
 import ReviewsList from '../components/ReviewsList'
+import PhotoLightbox from '../components/PhotoLightbox'
 
 export default function PropertyDetail() {
   const { id } = useParams()
@@ -21,6 +22,7 @@ export default function PropertyDetail() {
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
   const [isFavorited, setIsFavorited] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(null)
 
   const loadProperty = async () => {
     const {
@@ -162,11 +164,22 @@ export default function PropertyDetail() {
           <MessageButton property={property} />
         </div>
 
-        <PropertyListingDetail property={property} />
+        <PropertyListingDetail
+          property={property}
+          onImageClick={(index) => setLightboxIndex(index)}
+        />
 
         <h2>Reviews</h2>
         <ReviewsList userId={property.owner_id} />
       </div>
+
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          images={property.images.map((image) => image.url)}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
     </div>
   )
 }

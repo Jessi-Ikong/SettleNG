@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { API_BASE_URL } from '../lib/api'
@@ -285,6 +285,15 @@ export default function Profile() {
                 </form>
               )}
             </section>
+
+            {profile?.role === 'tenant' && (
+              <section className="profile-section">
+                <h2>Rental history</h2>
+                <Link to="/tenancy-history" className="btn-link">
+                  View your rental history
+                </Link>
+              </section>
+            )}
           </>
         )}
       </div>

@@ -250,7 +250,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
   const { data: existing, error: fetchError } = await supabase
     .from('properties')
-    .select('id, owner_id')
+    .select('id, owner_id, status')
     .eq('id', id)
     .maybeSingle()
 
@@ -268,6 +268,39 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
   const body = req.body || {}
   const payload = buildPropertyPayload(body)
+
+  // Marking a property rented with a specific tenant: verify that
+  // tenant actually has a completed/accepted inspection on THIS
+  // property before we let the owner attach them as the tenant — an
+  // owner could otherwise name any random user_id in the body.
+  const assigningTenant = body.status === 'rented' && body.tenant_id
+  if (assigningTenant) {
+    if (!UUID_RE.test(body.tenant_id)) {
+      return res.status(400).json({ error: 'A valid tenant_id is required' })
+    }
+
+    const { data: eligibleInspection, error: inspectionError } =
+      await supabase
+        .from('inspections')
+        .select('id')
+        .eq('property_id', id)
+        .eq('tenant_id', body.tenant_id)
+        .in('status', ['accepted', 'completed'])
+        .limit(1)
+        .maybeSingle()
+
+    if (inspectionError) {
+      return res
+        .status(500)
+        .json({ error: 'Failed to verify tenant eligibility' })
+    }
+    if (!eligibleInspection) {
+      return res.status(400).json({
+        error:
+          'This tenant has no completed or accepted inspection on this property',
+      })
+    }
+  }
 
   if ('neighborhood_id' in body || 'neighborhood_name' in body) {
     let neighborhoodId = toNullableInt(body.neighborhood_id)
@@ -308,6 +341,43 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
   if (error) {
     return res.status(500).json({ error: error.message })
+  }
+
+  if (assigningTenant) {
+    const { error: tenancyError } = await supabase.from('tenancies').insert({
+      property_id: id,
+      tenant_id: body.tenant_id,
+      landlord_id: existing.owner_id,
+    })
+    if (tenancyError) {
+      return res.status(500).json({ error: tenancyError.message })
+    }
+  } else if (
+    existing.status === 'rented' &&
+    body.status &&
+    body.status !== 'rented'
+  ) {
+    const { data: activeTenancy, error: activeTenancyError } = await supabase
+      .from('tenancies')
+      .select('id')
+      .eq('property_id', id)
+      .is('ended_at', null)
+      .maybeSingle()
+
+    if (activeTenancyError) {
+      return res.status(500).json({ error: activeTenancyError.message })
+    }
+
+    if (activeTenancy) {
+      const { error: endTenancyError } = await supabase
+        .from('tenancies')
+        .update({ ended_at: new Date().toISOString() })
+        .eq('id', activeTenancy.id)
+
+      if (endTenancyError) {
+        return res.status(500).json({ error: endTenancyError.message })
+      }
+    }
   }
 
   res.json(data)
@@ -539,6 +609,34 @@ router.get('/:id', async (req, res) => {
 
   const { owner, ...propertyFields } = property
 
+  // The tenant-assignment picker on "Mark as rented" needs this list
+  // while the property is still 'available' (about to be rented), and
+  // it stays useful to re-check once 'rented' too — so it's computed
+  // for the owner in either state, never for a public/tenant viewer.
+  let eligibleTenants
+  if (isOwner && ['available', 'rented'].includes(property.status)) {
+    const { data: eligibleRows, error: eligibleError } = await supabase
+      .from('inspections')
+      .select('tenant_id, tenant:tenant_id(full_name)')
+      .eq('property_id', id)
+      .in('status', ['accepted', 'completed'])
+
+    if (eligibleError) {
+      return res.status(500).json({ error: eligibleError.message })
+    }
+
+    const seen = new Map()
+    for (const row of eligibleRows) {
+      if (!seen.has(row.tenant_id)) {
+        seen.set(row.tenant_id, {
+          id: row.tenant_id,
+          full_name: row.tenant?.full_name ?? null,
+        })
+      }
+    }
+    eligibleTenants = [...seen.values()]
+  }
+
   res.json({
     ...propertyFields,
     images,
@@ -549,6 +647,7 @@ router.get('/:id', async (req, res) => {
     owner_name: owner?.full_name ?? null,
     owner_phone_verified: owner?.phone_verified ?? false,
     owner_identity_verified: owner?.identity_verified ?? false,
+    ...(eligibleTenants ? { eligible_tenants: eligibleTenants } : {}),
   })
 })
 

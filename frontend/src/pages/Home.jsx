@@ -6,6 +6,14 @@ import { API_BASE_URL } from '../lib/api'
 import { fetchTotalUnreadCount } from '../lib/messagesApi'
 import { formatInspectionDate } from '../lib/inspections'
 
+function formatSinceDate(isoString) {
+  return new Date(isoString).toLocaleDateString('en-NG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 const TENANT_UPCOMING_STATUSES = ['requested', 'accepted', 'rescheduled']
 
 const PROPERTY_STATUS_ROWS = [
@@ -42,6 +50,7 @@ export default function Home() {
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [savedSearchesCount, setSavedSearchesCount] = useState(0)
   const [properties, setProperties] = useState([])
+  const [currentTenancy, setCurrentTenancy] = useState(null)
   const [verificationDismissed, setVerificationDismissed] = useState(false)
   const [propertyVerificationDismissed, setPropertyVerificationDismissed] =
     useState(false)
@@ -66,6 +75,7 @@ export default function Home() {
       isLandlordAgent ? null : authedFetch('/api/favorites'),
       isLandlordAgent ? null : authedFetch('/api/saved-searches'),
       isLandlordAgent ? authedFetch('/api/properties?mine=true&limit=100') : null,
+      isLandlordAgent ? null : authedFetch('/api/tenancies/mine'),
     ]).then(
       ([
         inspectionsData,
@@ -74,6 +84,7 @@ export default function Home() {
         favoritesData,
         savedSearchesData,
         propertiesData,
+        tenanciesData,
       ]) => {
         if (cancelled) return
 
@@ -88,6 +99,9 @@ export default function Home() {
           setFavoritesCount(favoritesData?.items?.length || 0)
           setSavedSearchesCount(
             Array.isArray(savedSearchesData) ? savedSearchesData.length : 0,
+          )
+          setCurrentTenancy(
+            (tenanciesData?.items || []).find((t) => !t.ended_at) || null,
           )
         }
       },
@@ -171,6 +185,41 @@ export default function Home() {
             </button>
           </div>
         )}
+
+      {!isLandlordAgent && currentTenancy && currentTenancy.property && (
+        <Link
+          to={`/properties/${currentTenancy.property.id}`}
+          className="home-current-home-card"
+        >
+          {currentTenancy.property.first_image ? (
+            <img
+              src={currentTenancy.property.first_image}
+              alt={currentTenancy.property.title}
+              className="home-current-home-thumb"
+            />
+          ) : (
+            <div className="home-current-home-thumb home-current-home-thumb-empty">
+              No photo
+            </div>
+          )}
+          <div className="home-current-home-info">
+            <span className="home-current-home-label">Your current home</span>
+            <span className="home-current-home-title">
+              {currentTenancy.property.title}
+            </span>
+            <span className="home-current-home-meta">
+              {currentTenancy.property.neighborhood?.name},{' '}
+              {currentTenancy.property.ward?.lga?.name}
+            </span>
+            <span className="home-current-home-meta">
+              Landlord: {currentTenancy.landlord_name || 'Unknown'}
+            </span>
+            <span className="home-current-home-meta">
+              Since {formatSinceDate(currentTenancy.started_at)}
+            </span>
+          </div>
+        </Link>
+      )}
 
       <div className="home-cards-grid">
         {isLandlordAgent ? (

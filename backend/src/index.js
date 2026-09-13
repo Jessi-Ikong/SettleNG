@@ -13,6 +13,7 @@ import reportsRouter from './routes/reports.js'
 import reviewsRouter from './routes/reviews.js'
 import verificationRouter from './routes/verification.js'
 import adminRouter from './routes/admin.js'
+import tenanciesRouter from './routes/tenancies.js'
 
 const app = express()
 const PORT = process.env.PORT || 5050
@@ -36,6 +37,7 @@ app.use('/api/reports', reportsRouter)
 app.use('/api/reviews', reviewsRouter)
 app.use('/api/verification', verificationRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/tenancies', tenanciesRouter)
 
 app.listen(PORT, () => {
   console.log(`SettleNG API listening on port ${PORT}`)

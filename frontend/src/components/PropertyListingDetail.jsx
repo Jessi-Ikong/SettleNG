@@ -10,7 +10,11 @@ function formatNaira(amount) {
 // Interactive chrome (favorite/report/message/inspect buttons, the
 // title header, publish actions) stays with each caller since it
 // differs by context.
-export default function PropertyListingDetail({ property, ownerName }) {
+export default function PropertyListingDetail({
+  property,
+  ownerName,
+  onImageClick,
+}) {
   const typeLabel =
     PROPERTY_TYPES.find((t) => t.value === property.property_type)?.label ||
     property.property_type
@@ -19,9 +23,20 @@ export default function PropertyListingDetail({ property, ownerName }) {
     <>
       {property.images.length > 0 ? (
         <div className="property-gallery">
-          {property.images.map((image) => (
-            <img key={image.id} src={image.url} alt={property.title} />
-          ))}
+          {property.images.map((image, index) =>
+            onImageClick ? (
+              <button
+                key={image.id}
+                type="button"
+                className="property-gallery-thumb-button"
+                onClick={() => onImageClick(index)}
+              >
+                <img src={image.url} alt={property.title} />
+              </button>
+            ) : (
+              <img key={image.id} src={image.url} alt={property.title} />
+            ),
+          )}
         </div>
       ) : (
         <div className="property-gallery-empty">No photos yet</div>

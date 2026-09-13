@@ -42,6 +42,9 @@ export default function MyProperties() {
   const [uploadingId, setUploadingId] = useState(null)
   const [uploadFile, setUploadFile] = useState(null)
   const [uploadSubmitting, setUploadSubmitting] = useState(false)
+  const [pickerPropertyId, setPickerPropertyId] = useState(null)
+  const [pickerTenants, setPickerTenants] = useState(null)
+  const [selectedTenantId, setSelectedTenantId] = useState('')
 
   useEffect(() => {
     if (authLoading) return
@@ -127,7 +130,7 @@ export default function MyProperties() {
     setUploadFile(null)
   }
 
-  const handleStatusChange = async (propertyId, nextStatus) => {
+  const handleStatusChange = async (propertyId, nextStatus, tenantId) => {
     const previous = items
     setRowErrors((prev) => ({ ...prev, [propertyId]: '' }))
     setItems((prev) =>
@@ -147,7 +150,9 @@ export default function MyProperties() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ status: nextStatus }),
+      body: JSON.stringify(
+        tenantId ? { status: nextStatus, tenant_id: tenantId } : { status: nextStatus },
+      ),
     })
 
     setBusyId(null)
@@ -160,6 +165,28 @@ export default function MyProperties() {
         [propertyId]: body.error || 'Failed to update status',
       }))
     }
+  }
+
+  const openRentedPicker = async (propertyId) => {
+    setPickerPropertyId(propertyId)
+    setPickerTenants(null)
+    setSelectedTenantId('')
+    setRowErrors((prev) => ({ ...prev, [propertyId]: '' }))
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const res = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const data = await res.json()
+    setPickerTenants(data.eligible_tenants || [])
+  }
+
+  const confirmRented = (propertyId, tenantId) => {
+    setPickerPropertyId(null)
+    handleStatusChange(propertyId, 'rented', tenantId || undefined)
   }
 
   if (authLoading || loading) {
@@ -308,6 +335,63 @@ export default function MyProperties() {
                     </div>
                   )}
 
+                  {pickerPropertyId === property.id && (
+                    <div className="tenant-picker">
+                      <p className="tenant-picker-prompt">
+                        Who is renting this?
+                      </p>
+                      {pickerTenants === null ? (
+                        <p className="inspection-empty">
+                          Loading eligible tenants...
+                        </p>
+                      ) : pickerTenants.length === 0 ? (
+                        <p className="inspection-empty">
+                          No tenant has a completed or accepted inspection on
+                          this property yet.
+                        </p>
+                      ) : (
+                        <select
+                          value={selectedTenantId}
+                          onChange={(e) => setSelectedTenantId(e.target.value)}
+                        >
+                          <option value="">Select a tenant</option>
+                          {pickerTenants.map((tenant) => (
+                            <option key={tenant.id} value={tenant.id}>
+                              {tenant.full_name || 'Unnamed tenant'}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <div className="inspection-request-actions">
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={!selectedTenantId || busyId === property.id}
+                          onClick={() =>
+                            confirmRented(property.id, selectedTenantId)
+                          }
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          disabled={busyId === property.id}
+                          onClick={() => confirmRented(property.id, null)}
+                        >
+                          Skip / I'll track this outside the app
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setPickerPropertyId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {rowErrors[property.id] && (
                     <div className="form-error">{rowErrors[property.id]}</div>
                   )}
@@ -325,7 +409,9 @@ export default function MyProperties() {
                         className="btn-secondary"
                         disabled={busyId === property.id}
                         onClick={() =>
-                          handleStatusChange(property.id, action.next)
+                          action.next === 'rented'
+                            ? openRentedPicker(property.id)
+                            : handleStatusChange(property.id, action.next)
                         }
                       >
                         {action.label}

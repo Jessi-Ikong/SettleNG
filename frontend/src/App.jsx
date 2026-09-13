@@ -19,6 +19,7 @@ import AdminUsers from './pages/AdminUsers'
 import AdminLocations from './pages/AdminLocations'
 import AdminAuditLog from './pages/AdminAuditLog'
 import Profile from './pages/Profile'
+import TenancyHistory from './pages/TenancyHistory'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -165,6 +166,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tenancy-history"
+          element={
+            <ProtectedRoute>
+              <TenancyHistory />
             </ProtectedRoute>
           }
         />
