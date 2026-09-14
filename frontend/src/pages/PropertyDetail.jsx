@@ -62,22 +62,25 @@ export default function PropertyDetail() {
     fetchFavoritedIds().then((ids) => setIsFavorited(ids.has(id)))
   }, [id, user])
 
+  const loadSiblingUnits = async (buildingId) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const res = await fetch(`${API_BASE_URL}/api/buildings/${buildingId}`, {
+      headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+    })
+
+    setSiblingUnits(res.ok ? (await res.json())?.units || [] : [])
+  }
+
   useEffect(() => {
     if (!property?.building_id) {
       setSiblingUnits([])
       return
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      fetch(`${API_BASE_URL}/api/buildings/${property.building_id}`, {
-        headers: session
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : {},
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => setSiblingUnits(data?.units || []))
-        .catch(() => setSiblingUnits([]))
-    })
+    loadSiblingUnits(property.building_id).catch(() => setSiblingUnits([]))
   }, [property?.building_id])
 
   const handlePublish = async () => {
@@ -106,8 +109,14 @@ export default function PropertyDetail() {
 
     // The PATCH response doesn't carry the joined images/move_in_cost
     // shape the detail page needs — re-fetch the full detail instead
-    // of rendering the raw PATCH response.
+    // of rendering the raw PATCH response. If this unit is part of a
+    // building, its own entry in the sibling-unit dropdown just went
+    // stale too (still showing its pre-publish status), so refresh
+    // that as well.
     await loadProperty()
+    if (property?.building_id) {
+      loadSiblingUnits(property.building_id).catch(() => {})
+    }
     setPublishing(false)
   }
 

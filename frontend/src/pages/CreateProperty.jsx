@@ -11,6 +11,8 @@ import {
   PRICING_FIELDS,
 } from '../lib/amenities'
 
+const UNIT_LABEL_MAX_LENGTH = 40
+
 export default function CreateProperty() {
   const navigate = useNavigate()
   const { id: editPropertyId } = useParams()
@@ -243,6 +245,16 @@ export default function CreateProperty() {
 
     if (partOfBuilding && !unitLabel.trim()) {
       setError('Please enter a unit label.')
+      return
+    }
+    if (partOfBuilding && unitLabel.includes(',')) {
+      setError(
+        'Enter one unit label only, e.g. "Flat 1A" — add other units separately after this one is created',
+      )
+      return
+    }
+    if (partOfBuilding && unitLabel.trim().length > UNIT_LABEL_MAX_LENGTH) {
+      setError(`Unit label must be ${UNIT_LABEL_MAX_LENGTH} characters or fewer.`)
       return
     }
     if (partOfBuilding && !selectedBuildingId) {

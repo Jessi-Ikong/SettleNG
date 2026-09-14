@@ -32,6 +32,8 @@ const EDITABLE_FIELDS = [
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+const UNIT_LABEL_MAX_LENGTH = 40
+
 function toNullableNumber(value) {
   if (value === undefined || value === null || value === '') return null
   const num = Number(value)
@@ -183,6 +185,18 @@ router.post('/', requireAuth, async (req, res) => {
         .status(400)
         .json({ error: 'unit_label is required when building_id is set' })
     }
+    const trimmedUnitLabel = String(body.unit_label).trim()
+    if (trimmedUnitLabel.includes(',')) {
+      return res.status(400).json({
+        error:
+          "Enter one unit label only, e.g. \"Flat 1A\" — add other units separately after this one is created",
+      })
+    }
+    if (trimmedUnitLabel.length > UNIT_LABEL_MAX_LENGTH) {
+      return res.status(400).json({
+        error: `unit_label must be ${UNIT_LABEL_MAX_LENGTH} characters or fewer`,
+      })
+    }
 
     const { data: building, error: buildingError } = await supabase
       .from('buildings')
@@ -203,7 +217,7 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     buildingId = body.building_id
-    unitLabel = String(body.unit_label).trim()
+    unitLabel = trimmedUnitLabel
     wardId = building.ward_id
     neighborhoodId = building.neighborhood_id
     street = building.street
