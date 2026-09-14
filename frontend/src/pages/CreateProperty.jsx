@@ -209,17 +209,36 @@ export default function CreateProperty() {
     setPrices((prev) => ({ ...prev, [key]: value }))
   }
 
+  const selectedBuilding =
+    selectedBuildingId && selectedBuildingId !== '__new__'
+      ? buildings.find((b) => b.id === selectedBuildingId)
+      : null
+
+  const selectedBuildingAddress = selectedBuilding
+    ? [
+        selectedBuilding.neighborhood?.name,
+        selectedBuilding.ward?.name,
+        selectedBuilding.ward?.lga?.name,
+        selectedBuilding.ward?.lga?.state?.name,
+        selectedBuilding.street,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : ''
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
 
-    if (!location.wardId) {
-      setError('Please select a state, LGA, and ward.')
-      return
-    }
-    if (!neighborhoodName.trim()) {
-      setError('Please enter or select a neighborhood.')
-      return
+    if (!partOfBuilding) {
+      if (!location.wardId) {
+        setError('Please select a state, LGA, and ward.')
+        return
+      }
+      if (!neighborhoodName.trim()) {
+        setError('Please enter or select a neighborhood.')
+        return
+      }
     }
 
     if (partOfBuilding && !unitLabel.trim()) {
@@ -290,15 +309,20 @@ export default function CreateProperty() {
       toilets: toilets || null,
       furnished: furnished || null,
       amenities,
-      ward_id: location.wardId,
-      neighborhood_name: neighborhoodName,
-      street,
       ...Object.fromEntries(
         PRICING_FIELDS.map(({ key }) => [key, prices[key] || null]),
       ),
+      // A unit attached to a building inherits the building's own
+      // address server-side — sending the property's own location
+      // fields in that case would be misleading (the backend ignores
+      // them, but the payload shouldn't imply they're used).
       ...(buildingId
         ? { building_id: buildingId, unit_label: unitLabel.trim() }
-        : {}),
+        : {
+            ward_id: location.wardId,
+            neighborhood_name: neighborhoodName,
+            street,
+          }),
     }
 
     const saveRes = await fetch(
@@ -460,42 +484,46 @@ export default function CreateProperty() {
             </div>
           </div>
 
-          <div className="form-field">
-            <span>Location</span>
-            <LocationPicker onChange={setLocation} initialValue={location} />
-          </div>
+          {!partOfBuilding && (
+            <>
+              <div className="form-field">
+                <span>Location</span>
+                <LocationPicker onChange={setLocation} initialValue={location} />
+              </div>
 
-          <div className="form-field">
-            <label htmlFor="neighborhood">Neighborhood</label>
-            <input
-              id="neighborhood"
-              type="text"
-              list="neighborhood-options"
-              value={neighborhoodName}
-              onChange={(e) => setNeighborhoodName(e.target.value)}
-              placeholder={
-                location.wardId
-                  ? 'Type to search or add a new neighborhood'
-                  : 'Select a ward first'
-              }
-              disabled={!location.wardId}
-            />
-            <datalist id="neighborhood-options">
-              {neighborhoods.map((n) => (
-                <option key={n.id} value={n.name} />
-              ))}
-            </datalist>
-          </div>
+              <div className="form-field">
+                <label htmlFor="neighborhood">Neighborhood</label>
+                <input
+                  id="neighborhood"
+                  type="text"
+                  list="neighborhood-options"
+                  value={neighborhoodName}
+                  onChange={(e) => setNeighborhoodName(e.target.value)}
+                  placeholder={
+                    location.wardId
+                      ? 'Type to search or add a new neighborhood'
+                      : 'Select a ward first'
+                  }
+                  disabled={!location.wardId}
+                />
+                <datalist id="neighborhood-options">
+                  {neighborhoods.map((n) => (
+                    <option key={n.id} value={n.name} />
+                  ))}
+                </datalist>
+              </div>
 
-          <div className="form-field">
-            <label htmlFor="street">Street</label>
-            <input
-              id="street"
-              type="text"
-              value={street}
-              onChange={(e) => setStreet(e.target.value)}
-            />
-          </div>
+              <div className="form-field">
+                <label htmlFor="street">Street</label>
+                <input
+                  id="street"
+                  type="text"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                />
+              </div>
+            </>
+          )}
 
           {!isEditing && (
             <div className="form-field building-toggle-field">
@@ -532,6 +560,12 @@ export default function CreateProperty() {
                       <option value="__new__">+ Create new building</option>
                     </select>
                   </div>
+
+                  {selectedBuilding && (
+                    <p className="building-address-readout">
+                      This unit will be listed at: {selectedBuildingAddress}
+                    </p>
+                  )}
 
                   {selectedBuildingId === '__new__' && (
                     <div className="new-building-form">

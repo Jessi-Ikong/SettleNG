@@ -156,39 +156,24 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'property_type is required' })
   }
 
-  const wardId = toNullableInt(body.ward_id)
-  if (!wardId) {
-    return res.status(400).json({ error: 'ward_id is required' })
-  }
-
-  let neighborhoodId = toNullableInt(body.neighborhood_id)
-
-  if (!neighborhoodId && body.neighborhood_name) {
-    try {
-      neighborhoodId = await findOrCreateNeighborhood(
-        wardId,
-        body.neighborhood_name,
-        req.profile.id,
-      )
-    } catch (error) {
-      return res.status(500).json({ error: error.message })
-    }
-  }
-
-  if (!neighborhoodId) {
-    return res
-      .status(400)
-      .json({ error: 'neighborhood_id or neighborhood_name is required' })
-  }
-
   // Assigning a unit to a building is optional — leaving building_id
   // out keeps this identical to a standalone self-con/one-room
-  // listing. When it IS set, unit_label becomes required (this
-  // doubles the DB check constraint at the application layer so the
-  // error is a clean 400, not a raw Postgres constraint violation),
-  // and the building must actually belong to this landlord/agent.
+  // listing, with location coming from the request body exactly as
+  // before. When building_id IS set, the unit inherits the building's
+  // own ward_id/neighborhood_id/street wholesale — any location
+  // fields sent in the body are ignored entirely, not just
+  // discouraged client-side, so a unit's address can never
+  // structurally disagree with its building's. unit_label becomes
+  // required in that case (doubling the DB check constraint at the
+  // application layer for a clean 400 instead of a raw Postgres
+  // error), and the building must actually belong to this
+  // landlord/agent.
   let buildingId = null
   let unitLabel = null
+  let wardId
+  let neighborhoodId
+  let street
+
   if (body.building_id) {
     if (!UUID_RE.test(body.building_id)) {
       return res.status(400).json({ error: 'A valid building_id is required' })
@@ -201,7 +186,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     const { data: building, error: buildingError } = await supabase
       .from('buildings')
-      .select('id, owner_id')
+      .select('id, owner_id, ward_id, neighborhood_id, street')
       .eq('id', body.building_id)
       .maybeSingle()
 
@@ -219,12 +204,43 @@ router.post('/', requireAuth, async (req, res) => {
 
     buildingId = body.building_id
     unitLabel = String(body.unit_label).trim()
+    wardId = building.ward_id
+    neighborhoodId = building.neighborhood_id
+    street = building.street
+  } else {
+    wardId = toNullableInt(body.ward_id)
+    if (!wardId) {
+      return res.status(400).json({ error: 'ward_id is required' })
+    }
+
+    neighborhoodId = toNullableInt(body.neighborhood_id)
+
+    if (!neighborhoodId && body.neighborhood_name) {
+      try {
+        neighborhoodId = await findOrCreateNeighborhood(
+          wardId,
+          body.neighborhood_name,
+          req.profile.id,
+        )
+      } catch (error) {
+        return res.status(500).json({ error: error.message })
+      }
+    }
+
+    if (!neighborhoodId) {
+      return res
+        .status(400)
+        .json({ error: 'neighborhood_id or neighborhood_name is required' })
+    }
+
+    street = body.street ?? null
   }
 
   const payload = {
     ...buildPropertyPayload(body),
     ward_id: wardId,
     neighborhood_id: neighborhoodId,
+    street,
     owner_id: req.profile.id,
     status: 'draft',
     building_id: buildingId,

@@ -3,19 +3,7 @@ import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-
-function formatNaira(amount) {
-  return `₦${Number(amount).toLocaleString('en-NG')}`
-}
-
-const STATUS_META = {
-  draft: { label: 'Draft', className: 'status-draft' },
-  available: { label: 'Available', className: 'status-available' },
-  pending: { label: 'Pending', className: 'status-pending' },
-  rented: { label: 'Rented', className: 'status-rented' },
-  unavailable: { label: 'Unavailable', className: 'status-unavailable' },
-  suspended: { label: 'Suspended', className: 'status-suspended' },
-}
+import { STATUS_META, formatNaira } from '../lib/propertyStatus'
 
 const STATUS_ACTIONS = {
   draft: [{ label: 'Publish', next: 'available' }],

@@ -403,6 +403,7 @@ a {
 
 .form-row .form-field {
   flex: 1;
+  min-width: 0;
 }
 
 /* Two/three-field rows (CreateProperty's bedrooms/bathrooms/toilets,
@@ -467,6 +468,15 @@ a {
   background: #fff;
   border-radius: 8px;
   border: 1px solid rgba(23, 48, 74, 0.1);
+}
+
+.building-address-readout {
+  margin: 0;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.1);
+  border-radius: 8px;
+  font-size: 0.9rem;
 }
 
 .image-preview-grid {
@@ -730,6 +740,58 @@ a {
   font-weight: 500;
   color: var(--color-indigo);
   margin: 12px 0 20px;
+}
+
+.unit-comparison-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.unit-comparison-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 10px;
+  padding: 14px 18px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.unit-comparison-row:hover {
+  border-color: var(--color-brass);
+}
+
+.unit-comparison-label {
+  font-family: var(--font-headline);
+  font-weight: 800;
+  color: var(--color-indigo);
+  min-width: 110px;
+}
+
+.unit-comparison-facts {
+  flex: 1;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+
+.unit-comparison-rent {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .unit-comparison-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .unit-comparison-label {
+    min-width: 0;
+    width: 100%;
+  }
 }
 
 /* --- Property list --- */

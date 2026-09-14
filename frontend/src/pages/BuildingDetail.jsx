@@ -2,17 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
-import { useAuth } from '../context/AuthContext'
-import { fetchFavoritedIds } from '../lib/favoritesApi'
-import PropertyCard from '../components/PropertyCard'
+import { STATUS_META, formatNaira } from '../lib/propertyStatus'
 
 export default function BuildingDetail() {
   const { id } = useParams()
-  const { user } = useAuth()
   const [building, setBuilding] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [favoritedIds, setFavoritedIds] = useState(new Set())
 
   useEffect(() => {
     setLoading(true)
@@ -35,14 +31,6 @@ export default function BuildingDetail() {
         .finally(() => setLoading(false))
     })
   }, [id])
-
-  useEffect(() => {
-    if (!user) {
-      setFavoritedIds(new Set())
-      return
-    }
-    fetchFavoritedIds().then(setFavoritedIds)
-  }, [user])
 
   if (loading) {
     return <div className="page-loading">Loading...</div>
@@ -94,14 +82,42 @@ export default function BuildingDetail() {
           <p>No units listed for this building yet.</p>
         </div>
       ) : (
-        <div className="property-card-grid">
-          {building.units.map((unit) => (
-            <PropertyCard
-              key={unit.id}
-              property={unit}
-              favorited={favoritedIds.has(unit.id)}
-            />
-          ))}
+        <div className="unit-comparison-list">
+          {building.units.map((unit) => {
+            const meta = STATUS_META[unit.status] || {
+              label: unit.status,
+              className: '',
+            }
+            const facts = [
+              unit.bedrooms != null ? `${unit.bedrooms} bed` : null,
+              unit.bathrooms != null ? `${unit.bathrooms} bath` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+
+            return (
+              <Link
+                key={unit.id}
+                to={`/properties/${unit.id}`}
+                className="unit-comparison-row"
+              >
+                <span className="unit-comparison-label">
+                  {unit.unit_label || 'Unit'}
+                </span>
+                <span className="unit-comparison-facts">
+                  {facts || 'Details not provided'}
+                </span>
+                <span className="unit-comparison-rent">
+                  {unit.rent_amount != null
+                    ? formatNaira(unit.rent_amount)
+                    : 'Rent not provided'}
+                </span>
+                <span className={`status-badge ${meta.className}`}>
+                  {meta.label}
+                </span>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>
