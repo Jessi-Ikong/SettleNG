@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { fetchFavoritedIds } from '../lib/favoritesApi'
+import { STATUS_META } from '../lib/propertyStatus'
 import FavoriteButton from '../components/FavoriteButton'
 import RequestInspectionButton from '../components/RequestInspectionButton'
 import MessageButton from '../components/MessageButton'
@@ -15,6 +16,7 @@ import PhotoLightbox from '../components/PhotoLightbox'
 
 export default function PropertyDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { user, profile } = useAuth()
   const [property, setProperty] = useState(null)
   const [notFound, setNotFound] = useState(false)
@@ -23,6 +25,7 @@ export default function PropertyDetail() {
   const [publishError, setPublishError] = useState('')
   const [isFavorited, setIsFavorited] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(null)
+  const [siblingUnits, setSiblingUnits] = useState([])
 
   const loadProperty = async () => {
     const {
@@ -58,6 +61,24 @@ export default function PropertyDetail() {
     }
     fetchFavoritedIds().then((ids) => setIsFavorited(ids.has(id)))
   }, [id, user])
+
+  useEffect(() => {
+    if (!property?.building_id) {
+      setSiblingUnits([])
+      return
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch(`${API_BASE_URL}/api/buildings/${property.building_id}`, {
+        headers: session
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setSiblingUnits(data?.units || []))
+        .catch(() => setSiblingUnits([]))
+    })
+  }, [property?.building_id])
 
   const handlePublish = async () => {
     setPublishing(true)
@@ -122,13 +143,41 @@ export default function PropertyDetail() {
         </div>
 
         {property.building_id && (
-          <p className="property-building-context">
-            Part of{' '}
-            <Link to={`/buildings/${property.building_id}`}>
-              {property.building_name}
+          <div className="property-building-context">
+            <Link
+              to={`/buildings/${property.building_id}`}
+              className="property-building-link"
+            >
+              Part of {property.building_name}
             </Link>
-            {property.unit_label && ` — Unit ${property.unit_label}`}
-          </p>
+
+            {siblingUnits.length > 1 && (
+              <select
+                className="unit-switcher-select"
+                value={property.id}
+                onChange={(event) => {
+                  const nextId = event.target.value
+                  if (nextId !== property.id) navigate(`/properties/${nextId}`)
+                }}
+                aria-label="Switch to a different unit in this building"
+              >
+                {siblingUnits.map((unit) => {
+                  const meta = STATUS_META[unit.status] || {
+                    label: unit.status,
+                  }
+                  return (
+                    <option
+                      key={unit.id}
+                      value={unit.id}
+                      disabled={unit.status !== 'available' && unit.id !== property.id}
+                    >
+                      {unit.unit_label || 'Unit'} — {meta.label}
+                    </option>
+                  )
+                })}
+              </select>
+            )}
+          </div>
         )}
 
         <div className="property-owner-block">

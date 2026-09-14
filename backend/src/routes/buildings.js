@@ -260,16 +260,18 @@ router.get('/:id', async (req, res) => {
     return res.status(404).json({ error: `Building ${id} not found` })
   }
 
-  // A non-owner only ever gets to see units that are individually
-  // public too (the same "available, or you own it" rule GET
-  // /api/properties/:id already applies) — draft/suspended/etc. units
-  // never leak through the building page to a stranger. The owner
-  // sees every unit regardless of status, same as My Properties does.
-  // The counts below are always the real totals, not filtered by
-  // viewer — that's the whole point of surfacing them.
+  // A non-owner sees every unit that has ever been public — available,
+  // rented, unavailable, suspended, pending — since the whole point of
+  // this list (and the property-page unit switcher built on top of
+  // it) is showing the full picture of which units are open and which
+  // aren't. Only 'draft' units are held back from non-owners, same as
+  // every other draft-hides-from-the-public rule in the app; the
+  // owner sees every unit regardless of status, same as My Properties
+  // does. The counts below are always the real totals, not filtered
+  // by viewer — that's the whole point of surfacing them.
   const visibleUnits = isOwner
     ? allUnits
-    : allUnits.filter((u) => u.status === 'available')
+    : allUnits.filter((u) => u.status !== 'draft')
 
   res.json({
     ...building,

@@ -612,13 +612,28 @@ a {
 }
 
 .property-building-context {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
   margin: 4px 0 0;
-  font-size: 0.9rem;
 }
 
-.property-building-context a {
+.property-building-link {
+  font-size: 0.85rem;
   color: var(--color-brass);
   font-weight: 500;
+}
+
+.unit-switcher-select {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 8px 10px;
+  border: 1px solid rgba(23, 48, 74, 0.25);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--color-ink);
+  max-width: 100%;
 }
 
 .badge-not-verified {
