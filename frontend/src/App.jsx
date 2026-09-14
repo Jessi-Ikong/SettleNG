@@ -22,6 +22,8 @@ import Profile from './pages/Profile'
 import TenancyHistory from './pages/TenancyHistory'
 import BuildingDetail from './pages/BuildingDetail'
 import MyBuildings from './pages/MyBuildings'
+import PropertiesHub from './pages/PropertiesHub'
+import SavedHub from './pages/SavedHub'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
 
@@ -185,6 +187,22 @@ function App() {
           element={
             <ProtectedRoute>
               <MyBuildings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/properties-hub"
+          element={
+            <ProtectedRoute>
+              <PropertiesHub />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/saved"
+          element={
+            <ProtectedRoute>
+              <SavedHub />
             </ProtectedRoute>
           }
         />

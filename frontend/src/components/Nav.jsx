@@ -81,28 +81,13 @@ export default function Nav() {
           </Link>
         )}
         {canList && (
-          <Link to="/create-property" onClick={closeMenu}>
-            List a property
-          </Link>
-        )}
-        {canList && (
-          <Link to="/my-properties" onClick={closeMenu}>
-            My Properties
-          </Link>
-        )}
-        {canList && (
-          <Link to="/my-buildings" onClick={closeMenu}>
-            My Buildings
+          <Link to="/properties-hub" onClick={closeMenu}>
+            Properties
           </Link>
         )}
         {user && (
-          <Link to="/saved-properties" onClick={closeMenu}>
-            Saved Properties
-          </Link>
-        )}
-        {user && (
-          <Link to="/saved-searches" onClick={closeMenu}>
-            Saved Searches
+          <Link to="/saved" onClick={closeMenu}>
+            Saved
           </Link>
         )}
         {user && (

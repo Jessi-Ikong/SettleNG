@@ -2427,6 +2427,44 @@ a {
   border-radius: 999px;
 }
 
+/* --- Properties/Saved hub pages --- */
+
+.hub-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-decoration: none;
+  color: var(--color-indigo);
+}
+
+.hub-card:hover {
+  border-color: var(--color-brass);
+}
+
+.hub-card-title {
+  font-family: var(--font-headline);
+  font-weight: 700;
+}
+
+.hub-card-context {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--color-ink);
+  opacity: 0.75;
+}
+
 /* --- Admin users --- */
 
 .admin-users-filters {
