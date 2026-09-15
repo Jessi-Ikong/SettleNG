@@ -1502,3 +1502,33 @@ How to test this yourself:
 Notes: The backend was restarted many times this phase (once per meaningful config/code change, since it doesn't run under a file-watcher in this environment — still worth setting up nodemon or `node --watch` at some point, flagged again as in earlier phases) — the very last restart before wrapping up also had the useful side effect of clearing the in-memory rate-limit counters this session's own testing had exhausted, so the next real user of this dev instance won't inherit a spent OTP rate-limit budget from this testing. general limiter (100/15min) was NOT run to exhaustion (100 real requests would have taken meaningfully longer for marginal additional confidence) — its headers and correct exemption of /api/health were confirmed directly instead, and its mechanism is identical to the auth limiter's, which WAS run to exhaustion and back.
 
 ---
+
+Date: 2026-09-15
+Feature/Task: Add nodemon for backend auto-restart in development
+Files changed:
+- backend/package.json / package-lock.json (edited — added nodemon as a real devDependency, installed via `npm install --save-dev nodemon`, not just referenced. Added a "dev" script: `nodemon src/index.js`. "start" is untouched — still plain `node src/index.js`, no auto-restart, for anything production-like.)
+- README.md (edited — added a "Running locally" section (new; no such section existed before) right after the "Tech stack — hard rules" section: `npm run dev` for backend development with auto-restart, `npm start` for the no-auto-restart plain version, and a one-line pointer to the frontend's own `npm run dev` (Vite).)
+
+What was tested (by Claude Code), live, not just by reading nodemon's own docs:
+- Killed the backend's existing plain `node src/index.js` process and started it fresh via `npm run dev` — confirmed nodemon's own startup banner (version, watched paths/extensions, "starting `node src/index.js`") followed by the app's own "SettleNG API listening on port 5050", and confirmed GET /api/health responded normally.
+- Made a real, observable edit to a real route file (backend/src/routes/locations.js — temporarily had GET /api/locations/states tag every returned row with `__nodemon_test: true`) and saved it, then — without touching the running process at all — checked nodemon's own log output and confirmed it printed "restarting due to changes..." followed by "starting `node src/index.js`" and the listening message again, all on its own. Then called GET /api/locations/states again and confirmed the response NOW included `__nodemon_test: true` on every row — proving the new code was actually being served, not just that nodemon logged an attempt. Reverted the temporary edit, saved again, and confirmed via the exact same request (marker now absent) that the revert was also picked up automatically, with a matching restart in the log. Confirmed via `git diff` afterward that locations.js has zero net difference from what's committed — the temporary edit left no trace.
+- This is the first phase this whole session where the backend did NOT need a manual PowerShell kill + `npm start` cycle to pick up a code change — confirming this genuinely solves the "worth setting up nodemon" note that's been repeated in this file's own Notes section across several earlier phases.
+
+Expected result:
+- `npm run dev` starts the backend under nodemon; saving a change to any watched file (route handlers included) triggers an automatic restart with the new code live, with no manual process management needed. `npm start` is unchanged for anywhere auto-restart isn't wanted.
+
+Actual result:
+- Matches expected, confirmed live with a real route-file edit and a real API response reflecting it, not just nodemon's own restart log.
+
+Status: PASS
+
+How to test this yourself:
+1. From backend/, run `npm run dev` — confirm you see nodemon's startup banner followed by "SettleNG API listening on port 5050".
+2. While it's running, open any file under backend/src/, make a small edit (e.g. change a response field or add a console.log), and save.
+3. Watch the terminal — confirm nodemon prints "restarting due to changes..." on its own within a couple of seconds, with no action from you beyond saving the file.
+4. Hit the affected endpoint again — confirm your edit is actually live in the response.
+5. `npm start` instead — confirm it starts the same server but does NOT restart automatically if you edit a file afterward (this is the "no auto-restart" mode, unchanged from before).
+
+Notes: The backend is being left running under `npm run dev` (nodemon) rather than switched back to plain `node` after this phase — meaning every subsequent phase in this session should no longer need the manual PowerShell-kill-and-restart cycle that's been a recurring step (and a recurring Notes-section complaint) in nearly every backend-touching phase so far.
+
+---

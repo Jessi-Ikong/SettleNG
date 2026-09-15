@@ -36,6 +36,14 @@ before reporting back.
 - **Realtime**: Supabase Realtime (chat) — final decision pending vs.
   Socket.IO; default to Supabase Realtime unless told otherwise.
 
+## Running locally
+
+From `backend/`:
+- `npm run dev` — development, auto-restarts on file changes (nodemon)
+- `npm start` — plain `node src/index.js`, no auto-restart
+
+From `frontend/`: `npm run dev` (Vite dev server).
+
 ## Design system
 
 Brand: **SettleNG** — "Find a place, verified before you move."
