@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto'
 import { Router } from 'express'
-import multer from 'multer'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
 import { findOrCreateNeighborhood } from '../lib/neighborhoods.js'
+import { propertyImageUpload, withUploadErrorHandling } from '../lib/uploads.js'
 import {
   PRICING_FIELDS,
   LOCATION_JOIN,
@@ -13,7 +13,6 @@ import {
 } from '../lib/propertyShape.js'
 
 const router = Router()
-const upload = multer({ storage: multer.memoryStorage() })
 
 const EDITABLE_FIELDS = [
   'title',
@@ -688,7 +687,7 @@ router.get('/:id', async (req, res) => {
 router.post(
   '/:id/images',
   requireAuth,
-  upload.array('images'),
+  withUploadErrorHandling(propertyImageUpload.array('images')),
   async (req, res) => {
     const { id } = req.params
 

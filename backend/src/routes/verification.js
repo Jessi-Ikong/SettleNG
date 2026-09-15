@@ -1,12 +1,15 @@
 import { randomUUID } from 'crypto'
 import { Router } from 'express'
-import multer from 'multer'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
 import { logAdminAction } from '../lib/auditLog.js'
+import { verificationDocumentUpload, withUploadErrorHandling } from '../lib/uploads.js'
+import { createAuthLimiter } from '../middleware/rateLimiters.js'
+
+const phoneRequestLimiter = createAuthLimiter()
+const phoneConfirmLimiter = createAuthLimiter()
 
 const router = Router()
-const upload = multer({ storage: multer.memoryStorage() })
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -28,7 +31,7 @@ function generateOtpCode() {
 
 router.use(requireAuth)
 
-router.post('/phone/request', async (req, res) => {
+router.post('/phone/request', phoneRequestLimiter, async (req, res) => {
   const { error: invalidateError } = await supabase
     .from('phone_otps')
     .delete()
@@ -67,7 +70,7 @@ router.post('/phone/request', async (req, res) => {
   })
 })
 
-router.post('/phone/confirm', async (req, res) => {
+router.post('/phone/confirm', phoneConfirmLimiter, async (req, res) => {
   const { code } = req.body || {}
 
   if (!code) {
@@ -138,57 +141,63 @@ router.post('/phone/confirm', async (req, res) => {
   res.json({ message: 'Phone verified' })
 })
 
-router.post('/identity', upload.single('document'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'A document file is required' })
-  }
+router.post(
+  '/identity',
+  withUploadErrorHandling(verificationDocumentUpload.single('document')),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'A document file is required' })
+    }
 
-  const { data: existingPending, error: existingError } = await supabase
-    .from('identity_verifications')
-    .select('id')
-    .eq('user_id', req.profile.id)
-    .eq('status', 'pending')
-    .maybeSingle()
+    const { data: existingPending, error: existingError } = await supabase
+      .from('identity_verifications')
+      .select('id')
+      .eq('user_id', req.profile.id)
+      .eq('status', 'pending')
+      .maybeSingle()
 
-  if (existingError) {
-    return res.status(500).json({ error: 'Failed to look up existing submissions' })
-  }
-  if (existingPending) {
-    return res.status(400).json({
-      error: 'You already have a submission under review',
-    })
-  }
+    if (existingError) {
+      return res
+        .status(500)
+        .json({ error: 'Failed to look up existing submissions' })
+    }
+    if (existingPending) {
+      return res.status(400).json({
+        error: 'You already have a submission under review',
+      })
+    }
 
-  const path = `${req.profile.id}/${randomUUID()}-${req.file.originalname}`
+    const path = `${req.profile.id}/${randomUUID()}-${req.file.originalname}`
 
-  const { error: uploadError } = await supabase.storage
-    .from('verification-documents')
-    .upload(path, req.file.buffer, { contentType: req.file.mimetype })
+    const { error: uploadError } = await supabase.storage
+      .from('verification-documents')
+      .upload(path, req.file.buffer, { contentType: req.file.mimetype })
 
-  if (uploadError) {
-    return res.status(500).json({ error: uploadError.message })
-  }
+    if (uploadError) {
+      return res.status(500).json({ error: uploadError.message })
+    }
 
-  // document_url stores the private bucket's internal storage path,
-  // never a public URL — the bucket isn't public, so any viewing
-  // (admin queue, this response) goes through a freshly generated
-  // signed URL instead.
-  const { data, error } = await supabase
-    .from('identity_verifications')
-    .insert({
-      user_id: req.profile.id,
-      document_url: path,
-      status: 'pending',
-    })
-    .select('id, status, created_at')
-    .single()
+    // document_url stores the private bucket's internal storage path,
+    // never a public URL — the bucket isn't public, so any viewing
+    // (admin queue, this response) goes through a freshly generated
+    // signed URL instead.
+    const { data, error } = await supabase
+      .from('identity_verifications')
+      .insert({
+        user_id: req.profile.id,
+        document_url: path,
+        status: 'pending',
+      })
+      .select('id, status, created_at')
+      .single()
 
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
 
-  res.status(201).json(data)
-})
+    res.status(201).json(data)
+  },
+)
 
 router.get('/identity/status', async (req, res) => {
   const { data, error } = await supabase
@@ -299,78 +308,84 @@ router.patch('/identity/:id', requireAdmin, async (req, res) => {
   res.json(data)
 })
 
-router.post('/property/:propertyId', upload.single('document'), async (req, res) => {
-  const { propertyId } = req.params
+router.post(
+  '/property/:propertyId',
+  withUploadErrorHandling(verificationDocumentUpload.single('document')),
+  async (req, res) => {
+    const { propertyId } = req.params
 
-  if (!UUID_RE.test(propertyId)) {
-    return res.status(404).json({ error: `Property ${propertyId} not found` })
-  }
-  if (!req.file) {
-    return res.status(400).json({ error: 'A document file is required' })
-  }
+    if (!UUID_RE.test(propertyId)) {
+      return res.status(404).json({ error: `Property ${propertyId} not found` })
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'A document file is required' })
+    }
 
-  const { data: property, error: propertyError } = await supabase
-    .from('properties')
-    .select('id, owner_id')
-    .eq('id', propertyId)
-    .maybeSingle()
+    const { data: property, error: propertyError } = await supabase
+      .from('properties')
+      .select('id, owner_id')
+      .eq('id', propertyId)
+      .maybeSingle()
 
-  if (propertyError) {
-    return res.status(500).json({ error: 'Failed to look up property' })
-  }
-  if (!property) {
-    return res.status(404).json({ error: `Property ${propertyId} not found` })
-  }
-  if (property.owner_id !== req.profile.id) {
-    return res.status(403).json({ error: 'You do not own this property' })
-  }
+    if (propertyError) {
+      return res.status(500).json({ error: 'Failed to look up property' })
+    }
+    if (!property) {
+      return res.status(404).json({ error: `Property ${propertyId} not found` })
+    }
+    if (property.owner_id !== req.profile.id) {
+      return res.status(403).json({ error: 'You do not own this property' })
+    }
 
-  const { data: existingPending, error: existingError } = await supabase
-    .from('property_verifications')
-    .select('id')
-    .eq('property_id', propertyId)
-    .eq('status', 'pending')
-    .maybeSingle()
+    const { data: existingPending, error: existingError } = await supabase
+      .from('property_verifications')
+      .select('id')
+      .eq('property_id', propertyId)
+      .eq('status', 'pending')
+      .maybeSingle()
 
-  if (existingError) {
-    return res.status(500).json({ error: 'Failed to look up existing submissions' })
-  }
-  if (existingPending) {
-    return res.status(400).json({
-      error: 'This property already has a submission under review',
-    })
-  }
+    if (existingError) {
+      return res
+        .status(500)
+        .json({ error: 'Failed to look up existing submissions' })
+    }
+    if (existingPending) {
+      return res.status(400).json({
+        error: 'This property already has a submission under review',
+      })
+    }
 
-  // Namespaced under "property/" so these never collide with identity
-  // documents (which live under "<user id>/...") in the same shared
-  // private bucket.
-  const path = `property/${propertyId}/${randomUUID()}-${req.file.originalname}`
+    // Namespaced under "property/" so these never collide with identity
+    // documents (which live under "<user id>/...") in the same shared
+    // private bucket.
+    const path = `property/${propertyId}/${randomUUID()}-${req.file.originalname}`
 
-  const { error: uploadError } = await supabase.storage
-    .from('verification-documents')
-    .upload(path, req.file.buffer, { contentType: req.file.mimetype })
+    const { error: uploadError } = await supabase.storage
+      .from('verification-documents')
+      .upload(path, req.file.buffer, { contentType: req.file.mimetype })
 
-  if (uploadError) {
-    return res.status(500).json({ error: uploadError.message })
-  }
+    if (uploadError) {
+      return res.status(500).json({ error: uploadError.message })
+    }
 
-  const { data, error } = await supabase
-    .from('property_verifications')
-    .insert({
-      property_id: propertyId,
-      submitted_by: req.profile.id,
-      document_url: path,
-      status: 'pending',
-    })
-    .select('id, status, created_at')
-    .single()
+    const { data, error } = await supabase
+      .from('property_verifications')
+      .insert({
+        property_id: propertyId,
+        submitted_by: req.profile.id,
+        document_url: path,
+        status: 'pending',
+      })
+      .select('id, status, created_at')
+      .single()
 
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
 
-  res.status(201).json(data)
-})
+    res.status(201).json(data)
+  },
+)
 
 router.get('/property/queue', requireAdmin, async (req, res) => {
   const { data, error } = await supabase

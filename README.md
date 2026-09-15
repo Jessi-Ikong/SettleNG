@@ -100,6 +100,10 @@ never just the headline rent figure. Where a fee is unknown, show it as
   these from the authenticated session, not the request body.
 - Passwords hashed, ownership checks on every property mutation,
   webhook signature verification once payments are added.
+- CORS is an explicit allowlist read from `ALLOWED_ORIGINS`
+  (comma-separated) in `backend/.env`, never a wide-open `cors()`.
+  Currently just `http://localhost:5173` — add the real production
+  origin(s) to that list once a production domain exists.
 
 ## File-sharing convention
 

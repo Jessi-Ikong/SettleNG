@@ -1,6 +1,17 @@
 import 'dotenv/config'
+// Side-effect import, deliberately first (right after dotenv/config
+// populates process.env): validates required env vars and exits
+// immediately if any are missing. Must come before every other
+// import below — ES modules evaluate all imports, in order, before
+// any of this file's own top-level code runs, so a validateEnv()
+// *call* placed here instead would run too late, after
+// routes/*.js's transitive lib/supabaseClient.js had already crashed
+// with Supabase's own confusing raw error.
+import './lib/env.js'
 import express from 'express'
 import cors from 'cors'
+import { errorHandler } from './middleware/errorHandler.js'
+import { generalApiLimiter } from './middleware/rateLimiters.js'
 import meRouter from './routes/me.js'
 import locationsRouter from './routes/locations.js'
 import propertiesRouter from './routes/properties.js'
@@ -17,14 +28,48 @@ import tenanciesRouter from './routes/tenancies.js'
 import buildingsRouter from './routes/buildings.js'
 
 const app = express()
-const PORT = process.env.PORT || 5050
+const PORT = process.env.PORT
 
-app.use(cors())
+// Production origins get added to ALLOWED_ORIGINS (comma-separated)
+// once a real domain exists — see README.md. For now this is just
+// the local Vite dev server.
+const allowedOrigins = process.env.ALLOWED_ORIGINS.split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // No Origin header at all (curl, server-to-server calls, the
+      // health check) isn't a browser cross-origin request, so it's
+      // not something CORS applies to — let it through and leave any
+      // access control for that case to auth/route logic instead.
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+        return
+      }
+      callback(new Error('Not allowed by CORS'))
+    },
+  }),
+)
+// Gives a CORS rejection its own clean 403 instead of falling through
+// to the generic catch-all error handler as an unexplained 500.
+app.use((err, req, res, next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'Origin not allowed' })
+  }
+  next(err)
+})
+
 app.use(express.json())
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'SettleNG API' })
 })
+
+// Registered after the health check (so uptime/monitoring pings to
+// /api/health are never rate-limited) and before every other route.
+app.use('/api', generalApiLimiter)
 
 app.use('/api/me', meRouter)
 app.use('/api/locations', locationsRouter)
@@ -40,6 +85,8 @@ app.use('/api/verification', verificationRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/tenancies', tenanciesRouter)
 app.use('/api/buildings', buildingsRouter)
+
+app.use(errorHandler)
 
 app.listen(PORT, () => {
   console.log(`SettleNG API listening on port ${PORT}`)
