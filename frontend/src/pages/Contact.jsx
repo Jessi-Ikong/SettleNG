@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import useDocumentMeta from '../hooks/useDocumentMeta'
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -8,6 +9,11 @@ const CATEGORIES = [
 ]
 
 export default function Contact() {
+  useDocumentMeta(
+    'Contact us — SettleNG',
+    'Get in touch with the SettleNG team — general questions, technical issues, concerns, or business inquiries.',
+  )
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [category, setCategory] = useState('')

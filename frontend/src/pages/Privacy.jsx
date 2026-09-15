@@ -1,4 +1,11 @@
+import useDocumentMeta from '../hooks/useDocumentMeta'
+
 export default function Privacy() {
+  useDocumentMeta(
+    'Privacy Policy — SettleNG',
+    'What data SettleNG collects, why, who can see it, and how uploaded verification documents are kept private.',
+  )
+
   return (
     <div className="static-page">
       <div className="static-page-card">

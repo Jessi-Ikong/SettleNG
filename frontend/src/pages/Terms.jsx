@@ -1,4 +1,11 @@
+import useDocumentMeta from '../hooks/useDocumentMeta'
+
 export default function Terms() {
+  useDocumentMeta(
+    'Terms of Service — SettleNG',
+    'The terms that govern using SettleNG as a tenant, landlord, or agent, including account responsibilities and listing accuracy.',
+  )
+
   return (
     <div className="static-page">
       <div className="static-page-card">

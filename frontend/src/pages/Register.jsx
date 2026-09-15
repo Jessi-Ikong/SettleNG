@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import useDocumentMeta from '../hooks/useDocumentMeta'
 
 export default function Register() {
+  useDocumentMeta(
+    'Create an account — SettleNG',
+    'Sign up as a tenant, landlord, or agent to start searching or listing verified rentals in Nigeria.',
+  )
+
   const navigate = useNavigate()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')

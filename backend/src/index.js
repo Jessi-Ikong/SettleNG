@@ -26,6 +26,7 @@ import verificationRouter from './routes/verification.js'
 import adminRouter from './routes/admin.js'
 import tenanciesRouter from './routes/tenancies.js'
 import buildingsRouter from './routes/buildings.js'
+import shareRouter from './routes/share.js'
 
 const app = express()
 const PORT = process.env.PORT
@@ -66,6 +67,11 @@ app.use(express.json())
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'SettleNG API' })
 })
+
+// Server-rendered HTML shells for link-preview crawlers — deliberately
+// outside /api and the rate limiter below, since a crawler fetch isn't
+// a client API call and shouldn't compete with one for the same quota.
+app.use('/share', shareRouter)
 
 // Registered after the health check (so uptime/monitoring pings to
 // /api/health are never rate-limited) and before every other route.

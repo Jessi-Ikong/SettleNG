@@ -623,6 +623,7 @@ a {
   .btn-primary,
   .btn-secondary,
   .report-button,
+  .share-button,
   .filter-pill,
   select,
   input[type='text'],
@@ -2104,6 +2105,27 @@ a {
 .report-flag-icon {
   width: 12px;
   height: 12px;
+}
+
+/* --- Share --- */
+
+.share-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: 1px solid rgba(23, 48, 74, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-indigo);
+  cursor: pointer;
+}
+
+.share-button:hover {
+  background: rgba(23, 48, 74, 0.08);
 }
 
 .report-confirmation {

@@ -9,10 +9,12 @@ import FavoriteButton from '../components/FavoriteButton'
 import RequestInspectionButton from '../components/RequestInspectionButton'
 import MessageButton from '../components/MessageButton'
 import ReportButton from '../components/ReportButton'
+import ShareButton from '../components/ShareButton'
 import PropertyListingDetail from '../components/PropertyListingDetail'
 import ReviewsSummary from '../components/ReviewsSummary'
 import ReviewsList from '../components/ReviewsList'
 import PhotoLightbox from '../components/PhotoLightbox'
+import useDocumentMeta from '../hooks/useDocumentMeta'
 
 export default function PropertyDetail() {
   const { id } = useParams()
@@ -26,6 +28,13 @@ export default function PropertyDetail() {
   const [isFavorited, setIsFavorited] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [siblingUnits, setSiblingUnits] = useState([])
+
+  useDocumentMeta(
+    property ? `${property.title} — SettleNG` : 'SettleNG',
+    property
+      ? `${property.bedrooms != null ? `${property.bedrooms} bed` : 'Property'} in ${property.neighborhood?.name || property.ward?.name || 'Nigeria'} — view full move-in cost and verification on SettleNG.`
+      : 'Find verified rentals in Nigeria.',
+  )
 
   const loadProperty = async () => {
     const {
@@ -148,6 +157,7 @@ export default function PropertyDetail() {
             propertyId={property.id}
             initialFavorited={isFavorited}
           />
+          <ShareButton propertyId={property.id} />
           <ReportButton targetType="property" targetId={property.id} />
         </div>
 

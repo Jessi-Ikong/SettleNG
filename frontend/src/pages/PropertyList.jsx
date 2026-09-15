@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { fetchFavoritedIds } from '../lib/favoritesApi'
 import SearchFilters from '../components/SearchFilters'
 import PropertyCard from '../components/PropertyCard'
+import useDocumentMeta from '../hooks/useDocumentMeta'
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -38,6 +39,11 @@ function paramsToFilters(searchParams) {
 }
 
 export default function PropertyList() {
+  useDocumentMeta(
+    'Browse rentals — SettleNG',
+    'Filter verified Nigerian rentals by location, price, bedrooms, and amenities to find your next home.',
+  )
+
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [result, setResult] = useState({ items: [], total: 0, totalPages: 1 })

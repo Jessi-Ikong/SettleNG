@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { API_BASE_URL } from '../lib/api'
 import { fetchFavoritedIds } from '../lib/favoritesApi'
 import PropertyCard from '../components/PropertyCard'
+import useDocumentMeta from '../hooks/useDocumentMeta'
 
 const TENANT_STEPS = [
   'Search by location',
@@ -18,6 +19,11 @@ const LANDLORD_STEPS = [
 ]
 
 export default function Landing() {
+  useDocumentMeta(
+    'SettleNG — Find verified rentals in Nigeria',
+    'Search Nigerian rentals down to the street level, see the full move-in cost up front, and check phone, identity, and property verification before you commit.',
+  )
+
   const { user, profile } = useAuth()
   const [listings, setListings] = useState([])
   const [listingsLoaded, setListingsLoaded] = useState(false)

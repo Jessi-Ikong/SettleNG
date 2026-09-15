@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /home
+Disallow: /create-property
+Disallow: /edit-property
+Disallow: /my-properties
+Disallow: /my-buildings
+Disallow: /saved-properties
+Disallow: /saved-searches
+Disallow: /saved
+Disallow: /inspections
+Disallow: /messages
+Disallow: /profile
+Disallow: /tenancy-history
+Disallow: /properties-hub
+
+Sitemap: http://localhost:5173/sitemap.xml

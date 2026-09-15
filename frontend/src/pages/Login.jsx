@@ -2,8 +2,14 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import useDocumentMeta from '../hooks/useDocumentMeta'
 
 export default function Login() {
+  useDocumentMeta(
+    'Sign in — SettleNG',
+    'Log in to your SettleNG account to search rentals, manage listings, or message landlords and tenants.',
+  )
+
   const navigate = useNavigate()
   const { suspendedMessage, clearSuspendedMessage } = useAuth()
   const [email, setEmail] = useState('')

@@ -1,4 +1,11 @@
+import useDocumentMeta from '../hooks/useDocumentMeta'
+
 export default function About() {
+  useDocumentMeta(
+    'About us — SettleNG',
+    'SettleNG is a housing and rental marketplace built for Nigeria — street-level search, full move-in cost transparency, and real verification, currently live in Lagos and Cross River.',
+  )
+
   return (
     <div className="static-page">
       <div className="static-page-card">
