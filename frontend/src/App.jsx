@@ -26,6 +26,11 @@ import PropertiesHub from './pages/PropertiesHub'
 import SavedHub from './pages/SavedHub'
 import ProtectedRoute from './components/ProtectedRoute'
 import Nav from './components/Nav'
+import Footer from './components/Footer'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
+import About from './pages/About'
+import Contact from './pages/Contact'
 
 function App() {
   return (
@@ -206,7 +211,12 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
       </Routes>
+      <Footer />
     </>
   )
 }
