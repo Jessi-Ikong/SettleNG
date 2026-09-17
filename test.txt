@@ -1976,3 +1976,38 @@ How to test this yourself (reproduce deliberately):
 Notes: The 406 status is Supabase PostgREST's response for `.single()` finding zero rows — this is the expected signal for "profile doesn't exist," not a server error. Also observed the auth/v1/logout call itself occasionally return a transient 503 from Supabase's side during this test — this did not matter, since the Supabase JS client clears its local session state regardless of the server response, which is what actually stops the app from staying half-authenticated. Login.jsx has its own separate, narrower profile fetch (`select=role`) used only to decide where to navigate after sign-in; it was not changed since it's not the source of the persistent-broken-session bug (AuthContext's own listener still runs and signs out/redirects regardless of what Login.jsx does with its own fetch), but it does mean a deleted-profile login briefly shows two 406s in the network log instead of one — cosmetic only, not a functional issue.
 
 ---
+Date: 2026-09-17
+Feature/Task: Pre-deployment audit — hardcoded localhost, port handling, clean build/start verification, DEPLOYMENT.md
+Files changed:
+- frontend/scripts/generate-seo-files.js (new) — postbuild step that rewrites the built dist/sitemap.xml and dist/robots.txt to use VITE_SITE_URL instead of the checked-in http://localhost:5173 placeholder
+- frontend/package.json (added "postbuild" script)
+- frontend/.env.example (added VITE_SITE_URL)
+- DEPLOYMENT.md (new, project root)
+
+What was tested (by Claude Code):
+- Grepped the entire frontend and backend source (excluding node_modules) for "localhost" and "127.0.0.1". Found: frontend/src/lib/api.js and both .env.example files (already correctly env-driven with a dev-only fallback, no change needed), and frontend/public/sitemap.xml + frontend/public/robots.txt (genuinely hardcoded — these are static files Vite copies into dist/ unprocessed, so they can't read import.meta.env). Backend/src had zero matches.
+- Fixed the sitemap/robots case with a postbuild script rather than editing the checked-in public/ files directly, so dist/ (gitignored) is the only thing ever rewritten. Verified it twice: once with VITE_SITE_URL unset (correctly left the localhost default in place, a no-op) and once with VITE_SITE_URL=https://settleng.vercel.app (correctly rewrote every URL in both files).
+- Confirmed backend/src/index.js reads PORT directly from process.env.PORT with no hardcoded fallback, and that PORT is in the required-env-vars list in backend/src/lib/env.js — matches Render's requirement to bind to its own assigned port.
+- Backend clean-install test: stopped the running dev server, deleted backend/node_modules, ran npm install (123 packages, 0 vulnerabilities), ran npm start, confirmed GET /api/health returned {"status":"ok","service":"SettleNG API"} (200), then stopped it.
+- Frontend clean-install test: stopped the running dev server, deleted frontend/node_modules and dist/, ran npm install (37 packages, 0 vulnerabilities), ran npm run build (128 modules, built in under 1s, one pre-existing unrelated warning about the main JS chunk exceeding 500kB — a performance note, not an error), confirmed the postbuild script ran automatically and produced a working dist/. Ran npm run preview and confirmed GET / (200, correct <title>SettleNG</title>), GET /sitemap.xml (200), and GET /robots.txt (200) against the actual production build, not dev mode.
+- Restarted both normal dev servers afterward and confirmed both still respond (backend /api/health 200, frontend / 200).
+- Wrote DEPLOYMENT.md documenting every backend and frontend production env var (with descriptions), the build/start commands for each service, the required deploy order (backend first, then frontend with the backend's real URL, then back to the backend to set the real ALLOWED_ORIGINS and redeploy), and the Paystack webhook URL update this phase makes actionable.
+
+Expected result:
+- No genuine hardcoded-localhost bug reaches production; sitemap/robots use the real domain once VITE_SITE_URL is set.
+- Both services start cleanly from nothing but a fresh clone plus their env vars.
+- DEPLOYMENT.md is accurate enough to deploy from without guessing.
+
+Actual result: matches expected — see verification steps above.
+
+Status: PASS
+
+How to test this yourself:
+1. Backend: cd backend, rm -rf node_modules, npm install, npm start, curl http://localhost:5050/api/health — expect {"status":"ok","service":"SettleNG API"}.
+2. Frontend: cd frontend, rm -rf node_modules dist, npm install, npm run build (watch for the postbuild line rewriting sitemap/robots), npm run preview, open http://localhost:4173 — expect the real app, not a blank page or build error.
+3. Try VITE_SITE_URL=https://example.com node scripts/generate-seo-files.js from frontend/ after a build, then check dist/sitemap.xml and dist/robots.txt — every URL should now start with https://example.com instead of http://localhost:5173.
+4. Read DEPLOYMENT.md top to bottom and confirm every env var listed actually exists in backend/.env.example and frontend/.env.example — nothing invented, nothing missing.
+
+Notes: Did not touch the hardcoded property UUIDs inside frontend/public/sitemap.xml (they're dev-database fixture IDs, e.g. from local Supabase test properties) — those are stale/fake regardless of environment and aren't a "hardcoded localhost" problem, they're a content-freshness problem. Worth a future phase generating the sitemap dynamically from real published properties instead of a hand-maintained static file, but that's a bigger change than this phase asked for.
+
+---
