@@ -8,6 +8,7 @@ import { STATUS_META } from '../lib/propertyStatus'
 import FavoriteButton from '../components/FavoriteButton'
 import RequestInspectionButton from '../components/RequestInspectionButton'
 import MessageButton from '../components/MessageButton'
+import PayButton from '../components/PayButton'
 import ReportButton from '../components/ReportButton'
 import ShareButton from '../components/ShareButton'
 import PropertyListingDetail from '../components/PropertyListingDetail'
@@ -240,6 +241,7 @@ export default function PropertyDetail() {
         <div className="property-inspection-cta">
           <RequestInspectionButton property={property} />
           <MessageButton property={property} />
+          <PayButton property={property} />
         </div>
 
         <PropertyListingDetail

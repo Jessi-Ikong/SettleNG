@@ -12,12 +12,24 @@ export default function LocationPicker({ onChange, initialValue }) {
 
   const [loadingLgas, setLoadingLgas] = useState(false)
   const [loadingWards, setLoadingWards] = useState(false)
+  const [statesError, setStatesError] = useState(false)
 
   useEffect(() => {
+    setStatesError(false)
     fetch(`${API_BASE_URL}/api/locations/states`)
-      .then((res) => res.json())
-      .then((data) => setStates(data.filter((s) => s.active)))
-      .catch(() => setStates([]))
+      .then(async (res) => {
+        if (!res.ok) {
+          setStatesError(true)
+          setStates([])
+          return
+        }
+        const data = await res.json()
+        setStates(data.filter((s) => s.active))
+      })
+      .catch(() => {
+        setStatesError(true)
+        setStates([])
+      })
   }, [])
 
   useEffect(() => {
@@ -27,7 +39,7 @@ export default function LocationPicker({ onChange, initialValue }) {
     }
     setLoadingLgas(true)
     fetch(`${API_BASE_URL}/api/locations/states/${stateId}/lgas`)
-      .then((res) => res.json())
+      .then(async (res) => (res.ok ? res.json() : []))
       .then((data) => setLgas(data))
       .catch(() => setLgas([]))
       .finally(() => setLoadingLgas(false))
@@ -40,7 +52,7 @@ export default function LocationPicker({ onChange, initialValue }) {
     }
     setLoadingWards(true)
     fetch(`${API_BASE_URL}/api/locations/lgas/${lgaId}/wards`)
-      .then((res) => res.json())
+      .then(async (res) => (res.ok ? res.json() : []))
       .then((data) => setWards(data))
       .catch(() => setWards([]))
       .finally(() => setLoadingWards(false))
@@ -78,6 +90,11 @@ export default function LocationPicker({ onChange, initialValue }) {
 
   return (
     <div className="location-picker">
+      {statesError && (
+        <div className="form-error">
+          Couldn't load states — try refreshing.
+        </div>
+      )}
       <div className="signpost-trail">
         <select
           className="signpost-chip"

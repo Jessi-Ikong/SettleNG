@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 import { EDIT_WINDOW_MS, attachReplyPreviews } from '../lib/messageShape.js'
 
 const router = Router()
@@ -15,6 +16,7 @@ const EDIT_WINDOW_ERROR = 'Messages can only be edited within 1 hour of sending'
 const DELETE_WINDOW_ERROR = 'Messages can only be deleted within 1 hour of sending'
 
 router.use(requireAuth)
+router.use(generalApiLimiter)
 
 async function loadOwnedMessage(id, userId) {
   const { data, error } = await supabase

@@ -24,15 +24,23 @@ function filtersToSearch(filters) {
 export default function SavedSearches() {
   const [searches, setSearches] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   const load = () => {
     setLoading(true)
+    setLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch(`${API_BASE_URL}/api/saved-searches`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => setSearches(data))
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          setSearches(await res.json())
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }
@@ -62,7 +70,11 @@ export default function SavedSearches() {
     <div className="property-list-page">
       <h1>Saved searches</h1>
 
-      {searches.length === 0 ? (
+      {loadError ? (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
+      ) : searches.length === 0 ? (
         <div className="empty-state">
           <p>You haven't saved any searches yet.</p>
           <Link to="/properties" className="btn-secondary">

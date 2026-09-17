@@ -10,12 +10,24 @@ export default function AdminLocations() {
   const [busyId, setBusyId] = useState(null)
   const [rowErrors, setRowErrors] = useState({})
   const [rowWarnings, setRowWarnings] = useState({})
+  const [loadError, setLoadError] = useState(false)
 
   const load = () => {
     setLoading(true)
+    setLoadError(false)
     fetch(`${API_BASE_URL}/api/locations/states`)
-      .then((res) => res.json())
-      .then((data) => setStates(data || []))
+      .then(async (res) => {
+        if (!res.ok) {
+          setLoadError(true)
+          setStates([])
+          return
+        }
+        setStates(await res.json())
+      })
+      .catch(() => {
+        setLoadError(true)
+        setStates([])
+      })
       .finally(() => setLoading(false))
   }
 
@@ -102,6 +114,13 @@ export default function AdminLocations() {
   return (
     <div className="property-list-page">
       <h1>Locations</h1>
+
+      {loadError && (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
+      )}
+
       <p className="admin-locations-count">
         {activeCount} of {states.length} states active
       </p>

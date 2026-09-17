@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 import { STATUS_META, formatNaira } from '../lib/propertyStatus'
+import PayButton from '../components/PayButton'
 
 export default function BuildingDetail() {
   const { id } = useParams()
+  const { user, profile } = useAuth()
   const [building, setBuilding] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -95,27 +98,46 @@ export default function BuildingDetail() {
               .filter(Boolean)
               .join(' · ')
 
+            const isProspectiveTenant =
+              user &&
+              profile?.role === 'tenant' &&
+              profile.id !== unit.owner_id
+
             return (
-              <Link
-                key={unit.id}
-                to={`/properties/${unit.id}`}
-                className="unit-comparison-row"
-              >
-                <span className="unit-comparison-label">
-                  {unit.unit_label || 'Unit'}
-                </span>
-                <span className="unit-comparison-facts">
-                  {facts || 'Details not provided'}
-                </span>
-                <span className="unit-comparison-rent">
-                  {unit.rent_amount != null
-                    ? formatNaira(unit.rent_amount)
-                    : 'Rent not provided'}
-                </span>
-                <span className={`status-badge ${meta.className}`}>
-                  {meta.label}
-                </span>
-              </Link>
+              <div key={unit.id} className="unit-comparison-row">
+                <Link
+                  to={`/properties/${unit.id}`}
+                  className="unit-comparison-info"
+                >
+                  <span className="unit-comparison-label">
+                    {unit.unit_label || 'Unit'}
+                  </span>
+                  <span className="unit-comparison-facts">
+                    {facts || 'Details not provided'}
+                  </span>
+                  <span className="unit-comparison-rent">
+                    {unit.rent_amount != null
+                      ? formatNaira(unit.rent_amount)
+                      : 'Rent not provided'}
+                  </span>
+                  <span className={`status-badge ${meta.className}`}>
+                    {meta.label}
+                  </span>
+                </Link>
+
+                {unit.status === 'available' && isProspectiveTenant && (
+                  unit.viewer_can_pay ? (
+                    <PayButton property={unit} />
+                  ) : (
+                    <Link
+                      to={`/properties/${unit.id}`}
+                      className="btn-secondary unit-comparison-action"
+                    >
+                      Request inspection first
+                    </Link>
+                  )
+                )}
+              </div>
             )
           })}
         </div>

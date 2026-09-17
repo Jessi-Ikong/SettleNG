@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 import { logAdminAction } from '../lib/auditLog.js'
 
 const router = Router()
@@ -72,6 +73,7 @@ function toReportCard(row, targetMeta) {
 }
 
 router.use(requireAuth)
+router.use(generalApiLimiter)
 
 router.post('/', async (req, res) => {
   const { target_type: targetType, target_id: targetId, reason, details } =

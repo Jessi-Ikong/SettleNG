@@ -2,8 +2,10 @@ import { randomUUID } from 'crypto'
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 import { findOrCreateNeighborhood } from '../lib/neighborhoods.js'
 import { propertyImageUpload, withUploadErrorHandling } from '../lib/uploads.js'
+import { hasEligibleInspection } from '../lib/eligibility.js'
 import {
   PRICING_FIELDS,
   LOCATION_JOIN,
@@ -141,7 +143,7 @@ async function resolveLocationFilter(query) {
   return { type: 'none' }
 }
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, generalApiLimiter, async (req, res) => {
   if (!['landlord', 'agent'].includes(req.profile.role)) {
     return res.status(403).json({
       error: 'Only landlords or agents can create property listings',
@@ -267,13 +269,22 @@ router.post('/', requireAuth, async (req, res) => {
     .single()
 
   if (error) {
+    // 23505 = unique_violation — the unique_unit_label_per_building
+    // constraint. Caught here specifically so a landlord sees a clean
+    // "pick a different label" message instead of a raw Postgres
+    // constraint-name error.
+    if (error.code === '23505') {
+      return res.status(400).json({
+        error: `This building already has a unit labeled '${unitLabel}' — choose a different label`,
+      })
+    }
     return res.status(500).json({ error: error.message })
   }
 
   res.status(201).json(data)
 })
 
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, generalApiLimiter, async (req, res) => {
   const { id } = req.params
 
   if (!UUID_RE.test(id)) {
@@ -282,7 +293,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
   const { data: existing, error: fetchError } = await supabase
     .from('properties')
-    .select('id, owner_id, status')
+    .select('id, owner_id, status, building_id, ward_id, neighborhood_id, street')
     .eq('id', id)
     .maybeSingle()
 
@@ -301,6 +312,30 @@ router.patch('/:id', requireAuth, async (req, res) => {
   const body = req.body || {}
   const payload = buildPropertyPayload(body)
 
+  // A unit attached to a building inherits that building's address —
+  // enforced here, not just hidden client-side, since a request could
+  // otherwise bypass the UI entirely. Same-value resends are allowed
+  // (harmless no-ops the frontend's own diffing might still send);
+  // only a genuine attempt to change the value is rejected. Nothing
+  // cheap to compare a neighborhood_name string against without first
+  // resolving it, and the whole point is this unit's address should
+  // never be touched independently of its building, so any attempt to
+  // set neighborhood_id/neighborhood_name at all is rejected outright.
+  if (existing.building_id) {
+    const LOCKED_ADDRESS_ERROR =
+      "This unit's location is inherited from its building and can't be changed here — edit the building instead."
+
+    if ('ward_id' in payload && payload.ward_id !== existing.ward_id) {
+      return res.status(400).json({ error: LOCKED_ADDRESS_ERROR })
+    }
+    if ('street' in payload && payload.street !== existing.street) {
+      return res.status(400).json({ error: LOCKED_ADDRESS_ERROR })
+    }
+    if ('neighborhood_id' in body || 'neighborhood_name' in body) {
+      return res.status(400).json({ error: LOCKED_ADDRESS_ERROR })
+    }
+  }
+
   // Marking a property rented with a specific tenant: verify that
   // tenant actually has a completed/accepted inspection on THIS
   // property before we let the owner attach them as the tenant — an
@@ -311,22 +346,15 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'A valid tenant_id is required' })
     }
 
-    const { data: eligibleInspection, error: inspectionError } =
-      await supabase
-        .from('inspections')
-        .select('id')
-        .eq('property_id', id)
-        .eq('tenant_id', body.tenant_id)
-        .in('status', ['accepted', 'completed'])
-        .limit(1)
-        .maybeSingle()
-
-    if (inspectionError) {
+    let eligible
+    try {
+      eligible = await hasEligibleInspection(id, body.tenant_id)
+    } catch (err) {
       return res
         .status(500)
         .json({ error: 'Failed to verify tenant eligibility' })
     }
-    if (!eligibleInspection) {
+    if (!eligible) {
       return res.status(400).json({
         error:
           'This tenant has no completed or accepted inspection on this property',
@@ -415,7 +443,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
   res.json(data)
 })
 
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, generalApiLimiter, async (req, res) => {
   const { id } = req.params
 
   if (!UUID_RE.test(id)) {
@@ -454,7 +482,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.json(data)
 })
 
-router.get('/', async (req, res) => {
+router.get('/', generalApiLimiter, async (req, res) => {
   const q = req.query
 
   const page = Math.max(1, parsePositiveInt(q.page) || 1)
@@ -492,8 +520,33 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: error.message })
     }
 
+    // The active tenant's name on each rented property, so the
+    // frontend can warn a landlord by name before a status change
+    // away from 'rented' silently ends that tenancy.
+    const rentedIds = data.filter((p) => p.status === 'rented').map((p) => p.id)
+    const activeTenantByProperty = {}
+
+    if (rentedIds.length > 0) {
+      const { data: activeTenancies, error: tenanciesError } = await supabase
+        .from('tenancies')
+        .select('property_id, tenant:tenant_id(full_name)')
+        .in('property_id', rentedIds)
+        .is('ended_at', null)
+
+      if (tenanciesError) {
+        return res.status(500).json({ error: tenanciesError.message })
+      }
+
+      for (const row of activeTenancies) {
+        activeTenantByProperty[row.property_id] = row.tenant?.full_name ?? null
+      }
+    }
+
     return res.json({
-      items: data.map(toPropertyCard),
+      items: data.map((property) => ({
+        ...toPropertyCard(property),
+        active_tenant_name: activeTenantByProperty[property.id] ?? null,
+      })),
       page,
       pageSize,
       total: count,
@@ -587,7 +640,7 @@ router.get('/', async (req, res) => {
   })
 })
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', generalApiLimiter, async (req, res) => {
   const { id } = req.params
 
   if (!UUID_RE.test(id)) {
@@ -615,11 +668,13 @@ router.get('/:id', async (req, res) => {
   // suspended) listing too.
   let isOwner = false
   let isAdmin = false
+  let viewerId = null
   const authHeader = req.headers.authorization || ''
   if (authHeader.startsWith('Bearer ') && property) {
     const token = authHeader.slice('Bearer '.length)
     const { data: authData } = await supabase.auth.getUser(token)
-    if (authData?.user?.id === property.owner_id) {
+    viewerId = authData?.user?.id ?? null
+    if (viewerId === property.owner_id) {
       isOwner = true
     } else if (authData?.user) {
       const { data: viewerProfile } = await supabase
@@ -667,6 +722,39 @@ router.get('/:id', async (req, res) => {
       }
     }
     eligibleTenants = [...seen.values()]
+
+    // Extra context for the landlord's decision, not an automatic
+    // action — a successful payment doesn't assign the tenant itself.
+    if (eligibleTenants.length > 0) {
+      const { data: paidRows, error: paidError } = await supabase
+        .from('payments')
+        .select('tenant_id')
+        .eq('property_id', id)
+        .eq('status', 'success')
+
+      if (paidError) {
+        return res.status(500).json({ error: paidError.message })
+      }
+
+      const paidTenantIds = new Set(paidRows.map((row) => row.tenant_id))
+      eligibleTenants = eligibleTenants.map((tenant) => ({
+        ...tenant,
+        has_successful_payment: paidTenantIds.has(tenant.id),
+      }))
+    }
+  }
+
+  // Drives the "Pay & secure this unit" button's visibility for the
+  // logged-in tenant viewing their own eligibility, mirroring the same
+  // accepted/completed inspection rule the backend enforces when the
+  // payment is actually initialized.
+  let viewerCanPay = false
+  if (viewerId && !isOwner) {
+    try {
+      viewerCanPay = await hasEligibleInspection(id, viewerId)
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to verify tenant eligibility' })
+    }
   }
 
   res.json({
@@ -680,6 +768,7 @@ router.get('/:id', async (req, res) => {
     owner_phone_verified: owner?.phone_verified ?? false,
     owner_identity_verified: owner?.identity_verified ?? false,
     building_name: building?.name ?? null,
+    viewer_can_pay: viewerCanPay,
     ...(eligibleTenants ? { eligible_tenants: eligibleTenants } : {}),
   })
 })
@@ -687,6 +776,7 @@ router.get('/:id', async (req, res) => {
 router.post(
   '/:id/images',
   requireAuth,
+  generalApiLimiter,
   withUploadErrorHandling(propertyImageUpload.array('images')),
   async (req, res) => {
     const { id } = req.params

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { API_BASE_URL } from '../lib/api'
 
-export default function MessageButton({ property }) {
+export default function MessageButton({ property, label = 'Message owner' }) {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -58,7 +58,7 @@ export default function MessageButton({ property }) {
         className="btn-secondary"
         onClick={() => setOpen(true)}
       >
-        Message owner
+        {label}
       </button>
     )
   }

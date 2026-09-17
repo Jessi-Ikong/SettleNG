@@ -20,7 +20,7 @@ export default function SearchFilters({ filters, onChange, onClear }) {
       return
     }
     fetch(`${API_BASE_URL}/api/locations/wards/${filters.ward_id}/neighborhoods`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data) => setNeighborhoods(data))
       .catch(() => setNeighborhoods([]))
   }, [filters.ward_id])

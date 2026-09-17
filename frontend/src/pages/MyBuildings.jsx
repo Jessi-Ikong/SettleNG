@@ -8,6 +8,7 @@ export default function MyBuildings() {
   const { profile, loading: authLoading } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -21,8 +22,15 @@ export default function MyBuildings() {
       fetch(`${API_BASE_URL}/api/buildings?mine=true`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => setItems(data.items || []))
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
+          setItems(data.items || [])
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }, [authLoading, profile])
@@ -46,7 +54,11 @@ export default function MyBuildings() {
     <div className="property-list-page">
       <h1>My buildings</h1>
 
-      {items.length === 0 ? (
+      {loadError ? (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <p>You haven't added any buildings yet.</p>
           <Link to="/create-property" className="btn-secondary">

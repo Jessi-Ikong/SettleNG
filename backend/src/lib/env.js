@@ -3,6 +3,8 @@ const REQUIRED_ENV_VARS = [
   'SUPABASE_SERVICE_KEY',
   'PORT',
   'ALLOWED_ORIGINS',
+  'PAYSTACK_SECRET_KEY',
+  'PAYSTACK_PUBLIC_KEY',
 ]
 
 // Runs as a side effect of importing this module, not as a function

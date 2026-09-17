@@ -23,6 +23,7 @@ export default function Profile() {
 
   const [identityStatus, setIdentityStatus] = useState(null)
   const [identityLoading, setIdentityLoading] = useState(true)
+  const [identityLoadError, setIdentityLoadError] = useState(false)
   const [identityFile, setIdentityFile] = useState(null)
   const [identityError, setIdentityError] = useState('')
   const [identitySubmitting, setIdentitySubmitting] = useState(false)
@@ -33,12 +34,19 @@ export default function Profile() {
 
   const loadIdentityStatus = () => {
     setIdentityLoading(true)
+    setIdentityLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch(`${API_BASE_URL}/api/verification/identity/status`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => setIdentityStatus(data))
+        .then(async (res) => {
+          if (!res.ok) {
+            setIdentityLoadError(true)
+            return
+          }
+          setIdentityStatus(await res.json())
+        })
+        .catch(() => setIdentityLoadError(true))
         .finally(() => setIdentityLoading(false))
     })
   }
@@ -233,6 +241,10 @@ export default function Profile() {
 
               {identityLoading ? (
                 <p className="inspection-empty">Loading...</p>
+              ) : identityLoadError ? (
+                <div className="form-error">
+                  Something went wrong loading this page — try again.
+                </div>
               ) : !identityStatus ? (
                 <p className="not-verified-status">Not submitted</p>
               ) : (

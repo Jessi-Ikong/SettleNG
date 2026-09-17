@@ -7,14 +7,22 @@ import PropertyCard from '../components/PropertyCard'
 export default function SavedProperties() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch(`${API_BASE_URL}/api/favorites`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => setItems(data.items))
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
+          setItems(data.items || [])
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }, [])
@@ -31,7 +39,11 @@ export default function SavedProperties() {
     <div className="property-list-page">
       <h1>Saved properties</h1>
 
-      {items.length === 0 ? (
+      {loadError ? (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <p>You haven't saved any properties yet.</p>
           <Link to="/properties" className="btn-secondary">

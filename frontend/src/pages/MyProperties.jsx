@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { STATUS_META, formatNaira } from '../lib/propertyStatus'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const STATUS_ACTIONS = {
   draft: [{ label: 'Publish', next: 'available' }],
@@ -24,6 +25,7 @@ export default function MyProperties() {
   const { profile, loading: authLoading } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [rowErrors, setRowErrors] = useState({})
   const [busyId, setBusyId] = useState(null)
   const [verificationStatus, setVerificationStatus] = useState({})
@@ -33,6 +35,7 @@ export default function MyProperties() {
   const [pickerPropertyId, setPickerPropertyId] = useState(null)
   const [pickerTenants, setPickerTenants] = useState(null)
   const [selectedTenantId, setSelectedTenantId] = useState('')
+  const [tenancyWarning, setTenancyWarning] = useState(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -42,12 +45,17 @@ export default function MyProperties() {
       return
     }
 
+    setLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch(`${API_BASE_URL}/api/properties?mine=true`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => {
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
           const list = data.items || []
           setItems(list)
 
@@ -60,14 +68,17 @@ export default function MyProperties() {
                 fetch(`${API_BASE_URL}/api/verification/property/${p.id}/status`, {
                   headers: { Authorization: `Bearer ${s.access_token}` },
                 })
-                  .then((res) => res.json())
+                  .then((res) => (res.ok ? res.json() : null))
                   .then((status) => [p.id, status]),
               ),
             ).then((pairs) => {
-              setVerificationStatus(Object.fromEntries(pairs))
+              setVerificationStatus(
+                Object.fromEntries(pairs.filter(([, status]) => status !== null)),
+              )
             })
           })
         })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }, [profile, authLoading])
@@ -168,6 +179,16 @@ export default function MyProperties() {
     const res = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
+
+    if (!res.ok) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [propertyId]: 'Something went wrong loading eligible tenants — try again.',
+      }))
+      setPickerPropertyId(null)
+      return
+    }
+
     const data = await res.json()
     setPickerTenants(data.eligible_tenants || [])
   }
@@ -196,7 +217,11 @@ export default function MyProperties() {
     <div className="property-list-page">
       <h1>My properties</h1>
 
-      {items.length === 0 ? (
+      {loadError ? (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <p>You haven't listed any properties yet.</p>
           <Link to="/create-property" className="btn-secondary">
@@ -346,6 +371,9 @@ export default function MyProperties() {
                           {pickerTenants.map((tenant) => (
                             <option key={tenant.id} value={tenant.id}>
                               {tenant.full_name || 'Unnamed tenant'}
+                              {tenant.has_successful_payment
+                                ? ' — payment received'
+                                : ''}
                             </option>
                           ))}
                         </select>
@@ -396,11 +424,21 @@ export default function MyProperties() {
                         type="button"
                         className="btn-secondary"
                         disabled={busyId === property.id}
-                        onClick={() =>
-                          action.next === 'rented'
-                            ? openRentedPicker(property.id)
-                            : handleStatusChange(property.id, action.next)
-                        }
+                        onClick={() => {
+                          if (action.next === 'rented') {
+                            openRentedPicker(property.id)
+                            return
+                          }
+                          if (property.status === 'rented' && property.active_tenant_name) {
+                            setTenancyWarning({
+                              propertyId: property.id,
+                              nextStatus: action.next,
+                              tenantName: property.active_tenant_name,
+                            })
+                            return
+                          }
+                          handleStatusChange(property.id, action.next)
+                        }}
                       >
                         {action.label}
                       </button>
@@ -417,6 +455,19 @@ export default function MyProperties() {
             )
           })}
         </div>
+      )}
+
+      {tenancyWarning && (
+        <ConfirmDialog
+          message={`This will end ${tenancyWarning.tenantName}'s current tenancy on this property. Continue?`}
+          confirmLabel="End tenancy and continue"
+          onCancel={() => setTenancyWarning(null)}
+          onConfirm={() => {
+            const { propertyId, nextStatus } = tenancyWarning
+            setTenancyWarning(null)
+            handleStatusChange(propertyId, nextStatus)
+          }}
+        />
       )}
     </div>
   )

@@ -11,7 +11,6 @@ import './lib/env.js'
 import express from 'express'
 import cors from 'cors'
 import { errorHandler } from './middleware/errorHandler.js'
-import { generalApiLimiter } from './middleware/rateLimiters.js'
 import meRouter from './routes/me.js'
 import locationsRouter from './routes/locations.js'
 import propertiesRouter from './routes/properties.js'
@@ -27,6 +26,7 @@ import adminRouter from './routes/admin.js'
 import tenanciesRouter from './routes/tenancies.js'
 import buildingsRouter from './routes/buildings.js'
 import shareRouter from './routes/share.js'
+import paymentsRouter from './routes/payments.js'
 
 const app = express()
 const PORT = process.env.PORT
@@ -62,7 +62,20 @@ app.use((err, req, res, next) => {
   next(err)
 })
 
-app.use(express.json())
+// Captures the raw request body alongside Express's normal JSON
+// parsing (rather than a separate raw-body route) so every other
+// route keeps using req.body as-is; only the Paystack webhook route
+// reads req.rawBody, needed there because HMAC signature verification
+// must run over the exact bytes Paystack sent, not a re-serialized
+// (and potentially differently-ordered/whitespaced) copy of the
+// parsed JSON.
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf
+    },
+  }),
+)
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'SettleNG API' })
@@ -73,9 +86,13 @@ app.get('/api/health', (req, res) => {
 // a client API call and shouldn't compete with one for the same quota.
 app.use('/share', shareRouter)
 
-// Registered after the health check (so uptime/monitoring pings to
-// /api/health are never rate-limited) and before every other route.
-app.use('/api', generalApiLimiter)
+// No longer a single global mount here — each router below applies
+// the general rate limiter itself, positioned after that router's own
+// requireAuth where it has one, so the limiter can key by the
+// authenticated user's id instead of shared IP. See
+// middleware/rateLimiters.js for why. /api/health stays unlimited
+// (uptime/monitoring pings shouldn't compete with real traffic for a
+// budget), same as before.
 
 app.use('/api/me', meRouter)
 app.use('/api/locations', locationsRouter)
@@ -91,6 +108,7 @@ app.use('/api/verification', verificationRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/tenancies', tenanciesRouter)
 app.use('/api/buildings', buildingsRouter)
+app.use('/api/payments', paymentsRouter)
 
 app.use(errorHandler)
 

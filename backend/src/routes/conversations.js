@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 import { attachReplyPreviews, toMessageCard } from '../lib/messageShape.js'
 
 const MESSAGE_COLUMNS =
@@ -26,6 +27,7 @@ function firstImage(property) {
 }
 
 router.use(requireAuth)
+router.use(generalApiLimiter)
 
 async function getMembership(conversationId, userId) {
   const { data, error } = await supabase

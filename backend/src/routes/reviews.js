@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 
 const router = Router()
 
@@ -42,7 +43,7 @@ function toReviewCard(row) {
   }
 }
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, generalApiLimiter, async (req, res) => {
   const body = req.body || {}
   const { inspection_id: inspectionId, comment } = body
 
@@ -124,7 +125,7 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json(toReviewCard(data))
 })
 
-router.get('/user/:userId', async (req, res) => {
+router.get('/user/:userId', generalApiLimiter, async (req, res) => {
   const { userId } = req.params
 
   if (!UUID_RE.test(userId)) {
@@ -171,7 +172,7 @@ router.get('/user/:userId', async (req, res) => {
   })
 })
 
-router.get('/eligible', requireAuth, async (req, res) => {
+router.get('/eligible', requireAuth, generalApiLimiter, async (req, res) => {
   const { data: inspections, error } = await supabase
     .from('inspections')
     .select(

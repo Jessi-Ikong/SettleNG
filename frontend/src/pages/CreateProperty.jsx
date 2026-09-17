@@ -69,6 +69,13 @@ export default function CreateProperty() {
   const [notOwner, setNotOwner] = useState(false)
   const fileInputRef = useRef(null)
 
+  // Set only when editing a property that's part of a building — its
+  // location is inherited and locked, shown as a read-only recap
+  // instead of the editable Location/Neighborhood/Street fields.
+  const [editingBuildingId, setEditingBuildingId] = useState(null)
+  const [editingBuildingName, setEditingBuildingName] = useState(null)
+  const [editingBuildingAddress, setEditingBuildingAddress] = useState('')
+
   useEffect(() => {
     if (!isEditing || !profile) return
 
@@ -105,6 +112,21 @@ export default function CreateProperty() {
           })
           setNeighborhoodName(property.neighborhood.name || '')
           setStreet(property.street || '')
+          if (property.building_id) {
+            setEditingBuildingId(property.building_id)
+            setEditingBuildingName(property.building_name || null)
+            setEditingBuildingAddress(
+              [
+                property.neighborhood?.name,
+                property.ward?.name,
+                property.ward?.lga?.name,
+                property.ward?.lga?.state?.name,
+                property.street,
+              ]
+                .filter(Boolean)
+                .join(', '),
+            )
+          }
           setPrices({
             rent_amount: property.rent_amount ?? '',
             agency_fee: property.agency_fee ?? '',
@@ -125,7 +147,7 @@ export default function CreateProperty() {
       return
     }
     fetch(`${API_BASE_URL}/api/locations/wards/${location.wardId}/neighborhoods`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data) => setNeighborhoods(data))
       .catch(() => setNeighborhoods([]))
   }, [location.wardId])
@@ -162,7 +184,7 @@ export default function CreateProperty() {
     fetch(
       `${API_BASE_URL}/api/locations/wards/${newBuildingLocation.wardId}/neighborhoods`,
     )
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data) => setNewBuildingNeighborhoods(data))
       .catch(() => setNewBuildingNeighborhoods([]))
   }, [newBuildingLocation.wardId])
@@ -216,6 +238,11 @@ export default function CreateProperty() {
       ? buildings.find((b) => b.id === selectedBuildingId)
       : null
 
+  // Editing a unit that's already part of a building — its address is
+  // inherited and locked, same as at creation, just re-derived here
+  // since the create-mode building-toggle UI never renders in edit mode.
+  const isLockedBuildingUnit = isEditing && Boolean(editingBuildingId)
+
   const selectedBuildingAddress = selectedBuilding
     ? [
         selectedBuilding.neighborhood?.name,
@@ -232,7 +259,7 @@ export default function CreateProperty() {
     event.preventDefault()
     setError('')
 
-    if (!partOfBuilding) {
+    if (!partOfBuilding && !isLockedBuildingUnit) {
       if (!location.wardId) {
         setError('Please select a state, LGA, and ward.')
         return
@@ -325,16 +352,19 @@ export default function CreateProperty() {
         PRICING_FIELDS.map(({ key }) => [key, prices[key] || null]),
       ),
       // A unit attached to a building inherits the building's own
-      // address server-side — sending the property's own location
-      // fields in that case would be misleading (the backend ignores
-      // them, but the payload shouldn't imply they're used).
+      // address — sending the property's own location fields in that
+      // case would be misleading, and the backend now rejects any
+      // attempt to change them for a property with a building_id, so
+      // they're simply omitted rather than resent unchanged.
       ...(buildingId
         ? { building_id: buildingId, unit_label: unitLabel.trim() }
-        : {
-            ward_id: location.wardId,
-            neighborhood_name: neighborhoodName,
-            street,
-          }),
+        : isLockedBuildingUnit
+          ? {}
+          : {
+              ward_id: location.wardId,
+              neighborhood_name: neighborhoodName,
+              street,
+            }),
     }
 
     const saveRes = await fetch(
@@ -496,7 +526,17 @@ export default function CreateProperty() {
             </div>
           </div>
 
-          {!partOfBuilding && (
+          {isLockedBuildingUnit && (
+            <div className="form-field">
+              <span>Location</span>
+              <p className="building-address-readout">
+                Part of {editingBuildingName || 'this building'} —{' '}
+                {editingBuildingAddress}
+              </p>
+            </div>
+          )}
+
+          {!partOfBuilding && !isLockedBuildingUnit && (
             <>
               <div className="form-field">
                 <span>Location</span>

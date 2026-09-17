@@ -12,6 +12,7 @@ const HISTORY_STATUSES = ['rejected', 'cancelled', 'no_show']
 export default function TenantInspections() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [rowErrors, setRowErrors] = useState({})
   const [busyId, setBusyId] = useState(null)
   const [eligibleIds, setEligibleIds] = useState(null)
@@ -19,12 +20,20 @@ export default function TenantInspections() {
 
   const load = () => {
     setLoading(true)
+    setLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch(`${API_BASE_URL}/api/inspections?role=tenant`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => setItems(data.items))
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
+          setItems(data.items || [])
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }
@@ -86,6 +95,14 @@ export default function TenantInspections() {
 
   if (loading) {
     return <div className="page-loading">Loading...</div>
+  }
+
+  if (loadError) {
+    return (
+      <div className="form-error">
+        Something went wrong loading this page — try again.
+      </div>
+    )
   }
 
   const upcoming = items.filter((i) => UPCOMING_STATUSES.includes(i.status))

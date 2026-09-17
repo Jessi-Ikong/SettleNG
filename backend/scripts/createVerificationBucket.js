@@ -20,7 +20,7 @@ async function main() {
   }
 
   if (buckets.some((b) => b.name === 'verification-documents')) {
-    console.log('Bucket "verification-documents" already exists — leaving it as is.')
+    console.log('Bucket "verification-documents" already exists — leaving it as it is.')
     return
   }
 

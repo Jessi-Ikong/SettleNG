@@ -1,7 +1,9 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 import { findOrCreateNeighborhood } from '../lib/neighborhoods.js'
+import { hasEligibleInspection } from '../lib/eligibility.js'
 import {
   LOCATION_JOIN,
   PROPERTY_CARD_SELECT,
@@ -19,7 +21,7 @@ function toNullableInt(value) {
   return Number.isNaN(num) ? null : Math.trunc(num)
 }
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, generalApiLimiter, async (req, res) => {
   if (!['landlord', 'agent'].includes(req.profile.role)) {
     return res.status(403).json({
       error: 'Only landlords or agents can create buildings',
@@ -80,7 +82,7 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json(data)
 })
 
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, generalApiLimiter, async (req, res) => {
   const { id } = req.params
 
   if (!UUID_RE.test(id)) {
@@ -159,7 +161,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
   res.json(data)
 })
 
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, generalApiLimiter, async (req, res) => {
   if (String(req.query.mine) !== 'true') {
     return res.status(400).json({ error: 'mine=true is required' })
   }
@@ -210,7 +212,7 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ items })
 })
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', generalApiLimiter, async (req, res) => {
   const { id } = req.params
 
   if (!UUID_RE.test(id)) {
@@ -245,11 +247,13 @@ router.get('/:id', async (req, res) => {
   // from the buildings RLS policy here in application code, same
   // pattern as GET /api/properties/:id.
   let isOwner = false
+  let viewerId = null
   const authHeader = req.headers.authorization || ''
   if (authHeader.startsWith('Bearer ') && building) {
     const token = authHeader.slice('Bearer '.length)
     const { data: authData } = await supabase.auth.getUser(token)
-    if (authData?.user?.id === building.owner_id) {
+    viewerId = authData?.user?.id ?? null
+    if (viewerId === building.owner_id) {
       isOwner = true
     }
   }
@@ -273,9 +277,41 @@ router.get('/:id', async (req, res) => {
     ? allUnits
     : allUnits.filter((u) => u.status !== 'draft')
 
+  // Lets the building's consolidated unit list offer its own "Pay for
+  // this unit" action per available unit — same eligibility rule as
+  // that unit's own PayButton (an accepted/completed inspection on
+  // THIS specific unit), just reachable without first navigating to
+  // the unit's own page. Every unit shares the building's owner, so
+  // no extra query is needed for that half of PayButton's own checks.
+  let unitsForResponse = visibleUnits
+  if (viewerId && !isOwner) {
+    try {
+      unitsForResponse = await Promise.all(
+        visibleUnits.map(async (unit) => ({
+          ...unit,
+          owner_id: building.owner_id,
+          viewer_can_pay:
+            unit.status === 'available'
+              ? await hasEligibleInspection(unit.id, viewerId)
+              : false,
+        })),
+      )
+    } catch (err) {
+      return res
+        .status(500)
+        .json({ error: 'Failed to verify tenant eligibility' })
+    }
+  } else {
+    unitsForResponse = visibleUnits.map((unit) => ({
+      ...unit,
+      owner_id: building.owner_id,
+      viewer_can_pay: false,
+    }))
+  }
+
   res.json({
     ...building,
-    units: visibleUnits,
+    units: unitsForResponse,
     available_units_count: allUnits.filter((u) => u.status === 'available')
       .length,
     total_units_count: allUnits.length,

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
 import { logAdminAction } from '../lib/auditLog.js'
 import { verificationDocumentUpload, withUploadErrorHandling } from '../lib/uploads.js'
-import { createAuthLimiter } from '../middleware/rateLimiters.js'
+import { createAuthLimiter, generalApiLimiter } from '../middleware/rateLimiters.js'
 
 const phoneRequestLimiter = createAuthLimiter()
 const phoneConfirmLimiter = createAuthLimiter()
@@ -30,6 +30,7 @@ function generateOtpCode() {
 }
 
 router.use(requireAuth)
+router.use(generalApiLimiter)
 
 router.post('/phone/request', phoneRequestLimiter, async (req, res) => {
   const { error: invalidateError } = await supabase

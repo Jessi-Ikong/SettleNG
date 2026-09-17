@@ -48,6 +48,7 @@ export default function PropertyList() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [result, setResult] = useState({ items: [], total: 0, totalPages: 1 })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [favoritedIds, setFavoritedIds] = useState(new Set())
   const [showSaveSearch, setShowSaveSearch] = useState(false)
@@ -61,6 +62,7 @@ export default function PropertyList() {
 
   useEffect(() => {
     setLoading(true)
+    setLoadError(false)
     const query = new URLSearchParams()
     for (const key of FILTER_KEYS) {
       const value = searchParams.get(key)
@@ -70,8 +72,14 @@ export default function PropertyList() {
     query.set('page', String(page))
 
     fetch(`${API_BASE_URL}/api/properties?${query.toString()}`)
-      .then((res) => res.json())
-      .then((data) => setResult(data))
+      .then(async (res) => {
+        if (!res.ok) {
+          setLoadError(true)
+          return
+        }
+        setResult(await res.json())
+      })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
   }, [searchParams])
 
@@ -237,6 +245,10 @@ export default function PropertyList() {
 
           {loading ? (
             <div className="page-loading">Loading...</div>
+          ) : loadError ? (
+            <div className="form-error">
+              Something went wrong loading this page — try again.
+            </div>
           ) : result.items.length === 0 ? (
             <div className="empty-state">
               <p>No properties match your filters.</p>

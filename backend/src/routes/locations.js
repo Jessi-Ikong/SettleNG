@@ -1,7 +1,13 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 
 const router = Router()
+
+// Every route here is genuinely public (no requireAuth anywhere in
+// this router), so the shared limiter's keyGenerator naturally falls
+// back to IP for all of them — there's no user id to key by yet.
+router.use(generalApiLimiter)
 
 router.get('/states', async (req, res) => {
   const { data, error } = await supabase

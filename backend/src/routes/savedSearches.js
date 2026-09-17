@@ -1,10 +1,12 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 
 const router = Router()
 
 router.use(requireAuth)
+router.use(generalApiLimiter)
 
 router.post('/', async (req, res) => {
   const { name, filters } = req.body || {}

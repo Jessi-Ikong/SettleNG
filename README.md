@@ -112,6 +112,18 @@ never just the headline rent figure. Where a fee is unknown, show it as
   (comma-separated) in `backend/.env`, never a wide-open `cors()`.
   Currently just `http://localhost:5173` — add the real production
   origin(s) to that list once a production domain exists.
+- Rate limiting on any route behind `requireAuth` keys by the
+  authenticated user's id, not by IP. This is a direct fix for a real
+  fairness bug, not a stylistic choice: IP-based limiting means every
+  user behind the same carrier-grade NAT or shared office/campus
+  connection — extremely common on Nigerian mobile networks — draws
+  from one shared budget, so a handful of active tenants on the same
+  network can lock everyone else on it out of the app. Keying by user
+  id gives each account its own independent budget regardless of who
+  else shares its network. Only genuinely pre-authentication routes
+  (nothing behind `requireAuth` — e.g. `GET /api/locations/*`, the
+  Paystack webhook) fall back to IP, since there's no user id yet at
+  that point. See `backend/src/middleware/rateLimiters.js`.
 
 ## File-sharing convention
 

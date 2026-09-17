@@ -17,6 +17,7 @@ function formatSubmittedDate(dateString) {
 function useVerificationQueue(kind, active) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [rowErrors, setRowErrors] = useState({})
   const [busyId, setBusyId] = useState(null)
   const [rejectingId, setRejectingId] = useState(null)
@@ -24,12 +25,20 @@ function useVerificationQueue(kind, active) {
 
   const load = () => {
     setLoading(true)
+    setLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch(`${API_BASE_URL}/api/verification/${kind}/queue`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => setItems(data.items || []))
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
+          setItems(data.items || [])
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }
@@ -83,6 +92,7 @@ function useVerificationQueue(kind, active) {
   return {
     items,
     loading,
+    loadError,
     rowErrors,
     busyId,
     rejectingId,
@@ -165,6 +175,14 @@ function IdentityQueue({ active }) {
     return <div className="page-loading">Loading...</div>
   }
 
+  if (queue.loadError) {
+    return (
+      <div className="form-error">
+        Something went wrong loading this page — try again.
+      </div>
+    )
+  }
+
   if (queue.items.length === 0) {
     return <p className="inspection-empty">No pending submissions.</p>
   }
@@ -207,6 +225,14 @@ function PropertyQueue({ active }) {
 
   if (queue.loading) {
     return <div className="page-loading">Loading...</div>
+  }
+
+  if (queue.loadError) {
+    return (
+      <div className="form-error">
+        Something went wrong loading this page — try again.
+      </div>
+    )
   }
 
   if (queue.items.length === 0) {

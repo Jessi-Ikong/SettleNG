@@ -25,9 +25,11 @@ export default function AdminUsers() {
   const [busyId, setBusyId] = useState(null)
   const [suspendingId, setSuspendingId] = useState(null)
   const [suspendReason, setSuspendReason] = useState('')
+  const [loadError, setLoadError] = useState(false)
 
   const load = () => {
     setLoading(true)
+    setLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       const params = new URLSearchParams({ page: String(page), limit: '20' })
       if (roleFilter !== 'all') params.set('role', roleFilter)
@@ -36,11 +38,16 @@ export default function AdminUsers() {
       fetch(`${API_BASE_URL}/api/admin/users?${params.toString()}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => {
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
           setItems(data.items || [])
           setTotalPages(data.totalPages || 1)
         })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }
@@ -186,6 +193,10 @@ export default function AdminUsers() {
 
       {loading ? (
         <div className="page-loading">Loading...</div>
+      ) : loadError ? (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
       ) : items.length === 0 ? (
         <p className="inspection-empty">No users found.</p>
       ) : (

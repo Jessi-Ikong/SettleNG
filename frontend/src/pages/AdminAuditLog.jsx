@@ -46,6 +46,7 @@ export default function AdminAuditLog() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -55,15 +56,21 @@ export default function AdminAuditLog() {
     }
 
     setLoading(true)
+    setLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetch(`${API_BASE_URL}/api/admin/audit-log?page=${page}&limit=20`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => {
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
           setItems(data.items || [])
           setTotalPages(data.totalPages || 1)
         })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }, [profile, authLoading, page])
@@ -89,6 +96,10 @@ export default function AdminAuditLog() {
 
       {loading ? (
         <div className="page-loading">Loading...</div>
+      ) : loadError ? (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
       ) : items.length === 0 ? (
         <p className="inspection-empty">No admin actions logged yet.</p>
       ) : (

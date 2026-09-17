@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 import { logAdminAction } from '../lib/auditLog.js'
 
 const router = Router()
@@ -31,6 +32,7 @@ async function countRows(table, applyFilters) {
 }
 
 router.use(requireAuth, requireAdmin)
+router.use(generalApiLimiter)
 
 router.get('/stats', async (req, res) => {
   try {

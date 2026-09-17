@@ -2011,3 +2011,25 @@ How to test this yourself:
 Notes: Did not touch the hardcoded property UUIDs inside frontend/public/sitemap.xml (they're dev-database fixture IDs, e.g. from local Supabase test properties) — those are stale/fake regardless of environment and aren't a "hardcoded localhost" problem, they're a content-freshness problem. Worth a future phase generating the sitemap dynamically from real published properties instead of a hand-maintained static file, but that's a bigger change than this phase asked for.
 
 ---
+Date: 2026-09-17
+Feature/Task: Case-sensitive import audit (App.jsx and its full import graph) — pre-Vercel deployment check
+Files changed: none (audit found nothing to fix)
+
+What was tested (by Claude Code):
+- Read App.jsx's 34 local import statements and compared each import path against the exact on-disk filename (via directory listing, which reflects real stored case on NTFS, not just what was typed) — 0 mismatches.
+- Went further than the literal ask: wrote a small Node script that recursively walks every relative import starting from App.jsx (resolving extensionless imports the same way Vite would, across .jsx/.js/.json and index-file directories), across the whole reachable app — 62 files visited total. Checked every one of those import paths for an exact case match against the real filename on disk, and separately checked that every import actually resolves to a real file at all (a missing file would be a different, more obvious kind of bug, but worth ruling out in the same pass). Result: 0 case mismatches, 0 unresolved imports, across the entire graph — not just App.jsx's direct imports.
+- Ran `npm run build` afterward: succeeded, 128 modules transformed, no errors (same pre-existing unrelated >500kB chunk-size warning as prior build tests, not new).
+
+Expected result: every import path's case exactly matches its real file on disk, and the build succeeds locally.
+
+Actual result: matches expected — no fixes were needed.
+
+Status: PASS
+
+How to test this yourself:
+1. cd frontend && npm run build — should succeed with no errors.
+2. To re-run the same recursive audit yourself: write a small script (or ask Claude Code) to walk every relative import from App.jsx, resolve it against the real directory listing (fs.readdirSync, not just fs.existsSync — existsSync is case-insensitive on Windows/macOS and would hide the exact bug this is checking for), and compare case exactly.
+
+Notes: This check cannot actually catch a case mismatch by running locally on Windows — NTFS is case-insensitive, so a wrong-case import resolves fine here regardless. The directory-listing comparison method used here (checking the literal strings returned by readdirSync against the literal import path) is what makes this a real check despite running on Windows; a local `npm run build` passing is expected either way and does NOT by itself prove the app is safe on Vercel's Linux build environment. Since this audit found zero mismatches, there's nothing to confirm post-deploy specifically for this issue — but the general caveat stands for any future import added without this same rigor.
+
+---

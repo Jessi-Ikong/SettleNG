@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabaseClient.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generalApiLimiter } from '../middleware/rateLimiters.js'
 import { PROPERTY_CARD_SELECT, toPropertyCard } from '../lib/propertyShape.js'
 
 const router = Router()
@@ -9,6 +10,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 router.use(requireAuth)
+router.use(generalApiLimiter)
 
 router.post('/', async (req, res) => {
   const propertyId = req.body?.property_id

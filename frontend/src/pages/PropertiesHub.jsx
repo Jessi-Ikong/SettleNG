@@ -29,6 +29,7 @@ function summarizePropertyStatuses(items) {
 export default function PropertiesHub() {
   const { profile, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [propertiesSummary, setPropertiesSummary] = useState('')
   const [buildingsCount, setBuildingsCount] = useState(0)
 
@@ -44,15 +45,16 @@ export default function PropertiesHub() {
       Promise.all([
         fetch(`${API_BASE_URL}/api/properties?mine=true`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
-        }).then((res) => res.json()),
+        }).then((res) => (res.ok ? res.json() : Promise.reject())),
         fetch(`${API_BASE_URL}/api/buildings?mine=true`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
-        }).then((res) => res.json()),
+        }).then((res) => (res.ok ? res.json() : Promise.reject())),
       ])
         .then(([propertiesData, buildingsData]) => {
           setPropertiesSummary(summarizePropertyStatuses(propertiesData.items || []))
           setBuildingsCount((buildingsData.items || []).length)
         })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }, [authLoading, profile])
@@ -75,6 +77,12 @@ export default function PropertiesHub() {
   return (
     <div className="property-list-page">
       <h1>Properties</h1>
+
+      {loadError && (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
+      )}
 
       <div className="hub-cards-grid">
         <Link to="/create-property" className="hub-card">

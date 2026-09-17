@@ -33,16 +33,25 @@ export default function AdminReports() {
   const [busyId, setBusyId] = useState(null)
   const [propertyBusyId, setPropertyBusyId] = useState(null)
   const [propertyPreviews, setPropertyPreviews] = useState({})
+  const [loadError, setLoadError] = useState(false)
 
   const load = () => {
     setLoading(true)
+    setLoadError(false)
     supabase.auth.getSession().then(({ data: { session } }) => {
       const query = filter === 'all' ? '' : `?status=${filter}`
       fetch(`${API_BASE_URL}/api/reports${query}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((res) => res.json())
-        .then((data) => setItems(data.items || []))
+        .then(async (res) => {
+          if (!res.ok) {
+            setLoadError(true)
+            return
+          }
+          const data = await res.json()
+          setItems(data.items || [])
+        })
+        .catch(() => setLoadError(true))
         .finally(() => setLoading(false))
     })
   }
@@ -207,7 +216,11 @@ export default function AdminReports() {
         ))}
       </div>
 
-      {items.length === 0 ? (
+      {loadError ? (
+        <div className="form-error">
+          Something went wrong loading this page — try again.
+        </div>
+      ) : items.length === 0 ? (
         <p className="inspection-empty">No reports here.</p>
       ) : (
         <div className="admin-reports-list">

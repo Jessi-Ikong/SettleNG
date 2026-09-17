@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabaseClient'
 import { API_BASE_URL } from '../lib/api'
 import { fetchTotalUnreadCount } from '../lib/messagesApi'
 import { formatInspectionDate } from '../lib/inspections'
+import { formatNaira } from '../lib/propertyStatus'
+import MessageButton from '../components/MessageButton'
 
 function formatSinceDate(isoString) {
   return new Date(isoString).toLocaleDateString('en-NG', {
@@ -50,7 +52,8 @@ export default function Home() {
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [savedSearchesCount, setSavedSearchesCount] = useState(0)
   const [properties, setProperties] = useState([])
-  const [currentTenancy, setCurrentTenancy] = useState(null)
+  const [currentTenancies, setCurrentTenancies] = useState([])
+  const [paymentsMine, setPaymentsMine] = useState([])
   const [verificationDismissed, setVerificationDismissed] = useState(false)
   const [propertyVerificationDismissed, setPropertyVerificationDismissed] =
     useState(false)
@@ -76,6 +79,7 @@ export default function Home() {
       isLandlordAgent ? null : authedFetch('/api/saved-searches'),
       isLandlordAgent ? authedFetch('/api/properties?mine=true&limit=100') : null,
       isLandlordAgent ? null : authedFetch('/api/tenancies/mine'),
+      isLandlordAgent ? null : authedFetch('/api/payments/mine'),
     ]).then(
       ([
         inspectionsData,
@@ -85,6 +89,7 @@ export default function Home() {
         savedSearchesData,
         propertiesData,
         tenanciesData,
+        paymentsData,
       ]) => {
         if (cancelled) return
 
@@ -100,9 +105,13 @@ export default function Home() {
           setSavedSearchesCount(
             Array.isArray(savedSearchesData) ? savedSearchesData.length : 0,
           )
-          setCurrentTenancy(
-            (tenanciesData?.items || []).find((t) => !t.ended_at) || null,
+          // Every tenancy with no ended_at is a genuinely active home —
+          // a tenant renting in two different states should see both,
+          // not just whichever sorts first.
+          setCurrentTenancies(
+            (tenanciesData?.items || []).filter((t) => !t.ended_at),
           )
+          setPaymentsMine(paymentsData?.items || [])
         }
       },
     ).finally(() => {
@@ -186,39 +195,88 @@ export default function Home() {
           </div>
         )}
 
-      {!isLandlordAgent && currentTenancy && currentTenancy.property && (
-        <Link
-          to={`/properties/${currentTenancy.property.id}`}
-          className="home-current-home-card"
-        >
-          {currentTenancy.property.first_image ? (
-            <img
-              src={currentTenancy.property.first_image}
-              alt={currentTenancy.property.title}
-              className="home-current-home-thumb"
-            />
-          ) : (
-            <div className="home-current-home-thumb home-current-home-thumb-empty">
-              No photo
-            </div>
-          )}
-          <div className="home-current-home-info">
-            <span className="home-current-home-label">Your current home</span>
-            <span className="home-current-home-title">
-              {currentTenancy.property.title}
-            </span>
-            <span className="home-current-home-meta">
-              {currentTenancy.property.neighborhood?.name},{' '}
-              {currentTenancy.property.ward?.lga?.name}
-            </span>
-            <span className="home-current-home-meta">
-              Landlord: {currentTenancy.landlord_name || 'Unknown'}
-            </span>
-            <span className="home-current-home-meta">
-              Since {formatSinceDate(currentTenancy.started_at)}
-            </span>
-          </div>
-        </Link>
+      {!isLandlordAgent && currentTenancies.length > 0 && (
+        <div className="home-current-homes-section">
+          <h2 className="home-current-homes-heading">
+            {currentTenancies.length > 1
+              ? 'Your current homes'
+              : 'Your current home'}
+          </h2>
+
+          {currentTenancies
+            .filter((tenancy) => tenancy.property)
+            .map((tenancy) => {
+              const facts = [
+                tenancy.property.bedrooms != null
+                  ? `${tenancy.property.bedrooms} bed`
+                  : null,
+                tenancy.property.bathrooms != null
+                  ? `${tenancy.property.bathrooms} bath`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')
+
+              const payment = paymentsMine.find(
+                (p) =>
+                  p.property_id === tenancy.property.id &&
+                  p.status === 'success',
+              )
+
+              return (
+                <div key={tenancy.id} className="home-current-home-card">
+                  {tenancy.property.first_image ? (
+                    <img
+                      src={tenancy.property.first_image}
+                      alt={tenancy.property.title}
+                      className="home-current-home-thumb"
+                    />
+                  ) : (
+                    <div className="home-current-home-thumb home-current-home-thumb-empty">
+                      No photo
+                    </div>
+                  )}
+                  <div className="home-current-home-info">
+                    <span className="home-current-home-title">
+                      {tenancy.property.title}
+                    </span>
+                    <span className="home-current-home-meta">
+                      {tenancy.property.neighborhood?.name},{' '}
+                      {tenancy.property.ward?.lga?.name}
+                    </span>
+                    {facts && (
+                      <span className="home-current-home-meta">{facts}</span>
+                    )}
+                    <span className="home-current-home-meta">
+                      Landlord: {tenancy.landlord_name || 'Unknown'}
+                    </span>
+                    <span className="home-current-home-meta">
+                      Since {formatSinceDate(tenancy.started_at)}
+                    </span>
+                    <span className="home-current-home-meta">
+                      Paid:{' '}
+                      {payment ? formatNaira(payment.amount) : 'not on record'}
+                    </span>
+                    <div className="home-current-home-actions">
+                      <MessageButton
+                        property={{
+                          id: tenancy.property.id,
+                          owner_id: tenancy.property.owner_id,
+                        }}
+                        label="Message landlord"
+                      />
+                      <Link
+                        to={`/properties/${tenancy.property.id}`}
+                        className="btn-link"
+                      >
+                        View full listing
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+        </div>
       )}
 
       <div className="home-cards-grid">
