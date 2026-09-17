@@ -40,12 +40,12 @@ export default function Landing() {
   }, [])
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !profile) {
       setFavoritedIds(new Set())
       return
     }
     fetchFavoritedIds().then(setFavoritedIds)
-  }, [user])
+  }, [user, profile])
 
   return (
     <main className="landing-page">

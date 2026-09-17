@@ -8,13 +8,14 @@ export default function Nav() {
   const location = useLocation()
   const canList = profile && ['landlord', 'agent'].includes(profile.role)
   const isAdmin = profile?.role === 'admin'
+  const isTenant = profile?.role === 'tenant'
   const showHome = profile && ['tenant', 'landlord', 'agent'].includes(profile.role)
   const [unreadCount, setUnreadCount] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const navRef = useRef(null)
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !profile) {
       setUnreadCount(0)
       return
     }
@@ -24,7 +25,7 @@ export default function Nav() {
 
     window.addEventListener('unread-count-changed', refresh)
     return () => window.removeEventListener('unread-count-changed', refresh)
-  }, [user])
+  }, [user, profile])
 
   useEffect(() => {
     setMenuOpen(false)
@@ -96,6 +97,16 @@ export default function Nav() {
             onClick={closeMenu}
           >
             Inspections
+          </Link>
+        )}
+        {isTenant && (
+          <Link to="/payments" onClick={closeMenu}>
+            Payments
+          </Link>
+        )}
+        {canList && (
+          <Link to="/payments-received" onClick={closeMenu}>
+            Payments received
           </Link>
         )}
         {user && (

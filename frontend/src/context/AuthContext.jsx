@@ -15,13 +15,21 @@ export function AuthProvider({ children }) {
         const sessionUser = session?.user ?? null
 
         if (sessionUser) {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', sessionUser.id)
             .single()
 
-          if (data?.suspended) {
+          if (error || !data) {
+            setUser(null)
+            setProfile(null)
+            setLoading(false)
+            await supabase.auth.signOut()
+            return
+          }
+
+          if (data.suspended) {
             setSuspendedMessage(
               `Your account has been suspended: ${data.suspended_reason || 'no reason given'}. Contact support.`,
             )
@@ -33,7 +41,7 @@ export function AuthProvider({ children }) {
           }
 
           setUser(sessionUser)
-          setProfile(data ?? null)
+          setProfile(data)
         } else {
           setUser(null)
           setProfile(null)

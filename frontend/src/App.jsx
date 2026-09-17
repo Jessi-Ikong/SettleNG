@@ -31,193 +31,222 @@ import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import PaymentCallback from './pages/PaymentCallback'
+import PaymentHistory from './pages/PaymentHistory'
+import PaymentsReceived from './pages/PaymentsReceived'
 
 function App() {
   return (
-    <>
+    <div className="app-shell">
       <Nav />
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/home"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/create-property"
-          element={
-            <ProtectedRoute>
-              <CreateProperty />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/edit-property/:id"
-          element={
-            <ProtectedRoute>
-              <CreateProperty />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/my-properties"
-          element={
-            <ProtectedRoute>
-              <MyProperties />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/properties" element={<PropertyList />} />
-        <Route path="/properties/:id" element={<PropertyDetail />} />
-        <Route
-          path="/saved-properties"
-          element={
-            <ProtectedRoute>
-              <SavedProperties />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/saved-searches"
-          element={
-            <ProtectedRoute>
-              <SavedSearches />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inspections/tenant"
-          element={
-            <ProtectedRoute>
-              <TenantInspections />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inspections/owner"
-          element={
-            <ProtectedRoute>
-              <OwnerInspections />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/messages"
-          element={
-            <ProtectedRoute>
-              <Messages />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/messages/:conversationId"
-          element={
-            <ProtectedRoute>
-              <Messages />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <ProtectedRoute>
-              <AdminUsers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/locations"
-          element={
-            <ProtectedRoute>
-              <AdminLocations />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/audit-log"
-          element={
-            <ProtectedRoute>
-              <AdminAuditLog />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/reports"
-          element={
-            <ProtectedRoute>
-              <AdminReports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/verifications"
-          element={
-            <ProtectedRoute>
-              <AdminVerifications />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tenancy-history"
-          element={
-            <ProtectedRoute>
-              <TenancyHistory />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/buildings/:id" element={<BuildingDetail />} />
-        <Route
-          path="/my-buildings"
-          element={
-            <ProtectedRoute>
-              <MyBuildings />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/properties-hub"
-          element={
-            <ProtectedRoute>
-              <PropertiesHub />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/saved"
-          element={
-            <ProtectedRoute>
-              <SavedHub />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-      </Routes>
+      <main className="app-main">
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/home"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/create-property"
+            element={
+              <ProtectedRoute>
+                <CreateProperty />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/edit-property/:id"
+            element={
+              <ProtectedRoute>
+                <CreateProperty />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-properties"
+            element={
+              <ProtectedRoute>
+                <MyProperties />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/properties" element={<PropertyList />} />
+          <Route path="/properties/:id" element={<PropertyDetail />} />
+          <Route
+            path="/saved-properties"
+            element={
+              <ProtectedRoute>
+                <SavedProperties />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/saved-searches"
+            element={
+              <ProtectedRoute>
+                <SavedSearches />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inspections/tenant"
+            element={
+              <ProtectedRoute>
+                <TenantInspections />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inspections/owner"
+            element={
+              <ProtectedRoute>
+                <OwnerInspections />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <Messages />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages/:conversationId"
+            element={
+              <ProtectedRoute>
+                <Messages />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute>
+                <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/locations"
+            element={
+              <ProtectedRoute>
+                <AdminLocations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-log"
+            element={
+              <ProtectedRoute>
+                <AdminAuditLog />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute>
+                <AdminReports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/verifications"
+            element={
+              <ProtectedRoute>
+                <AdminVerifications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tenancy-history"
+            element={
+              <ProtectedRoute>
+                <TenancyHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/buildings/:id" element={<BuildingDetail />} />
+          <Route
+            path="/my-buildings"
+            element={
+              <ProtectedRoute>
+                <MyBuildings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/properties-hub"
+            element={
+              <ProtectedRoute>
+                <PropertiesHub />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/saved"
+            element={
+              <ProtectedRoute>
+                <SavedHub />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route
+            path="/payments/callback"
+            element={
+              <ProtectedRoute>
+                <PaymentCallback />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute>
+                <PaymentHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments-received"
+            element={
+              <ProtectedRoute>
+                <PaymentsReceived />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </main>
       <Footer />
-    </>
+    </div>
   )
 }
 
