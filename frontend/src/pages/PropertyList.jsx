@@ -160,8 +160,21 @@ export default function PropertyList() {
           type="button"
           className="btn-secondary filters-toggle"
           onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
         >
-          {filtersOpen ? 'Hide filters' : 'Show filters'}
+          <svg
+            viewBox="0 0 24 24"
+            className="filters-toggle-icon"
+            aria-hidden="true"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          >
+            <path d="M3 4H21L14 14V20H10V14Z" />
+          </svg>
+          {filtersOpen ? 'Close filters' : 'Filters'}
         </button>
       </div>
 

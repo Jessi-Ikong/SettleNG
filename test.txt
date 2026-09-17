@@ -2033,3 +2033,81 @@ How to test this yourself:
 Notes: This check cannot actually catch a case mismatch by running locally on Windows — NTFS is case-insensitive, so a wrong-case import resolves fine here regardless. The directory-listing comparison method used here (checking the literal strings returned by readdirSync against the literal import path) is what makes this a real check despite running on Windows; a local `npm run build` passing is expected either way and does NOT by itself prove the app is safe on Vercel's Linux build environment. Since this audit found zero mismatches, there's nothing to confirm post-deploy specifically for this issue — but the general caveat stands for any future import added without this same rigor.
 
 ---
+Date: 2026-09-17
+Feature/Task: Investigate unprompted native "access other apps and services on this device" permission dialog on production Landing page (mobile Android/Chrome)
+Files changed: none — investigation found no app-code cause
+
+What was tested (by Claude Code):
+- Grepped the entire frontend for "paystack" (case-insensitive): only found in code comments, a UI string ("Redirecting to Paystack..."), and displaying payment.paystack_reference values — no <script> tag or SDK import anywhere. Confirmed PayButton.jsx uses a pure server-redirect flow (window.location.href to Paystack's hosted checkout page, returned by the backend), never loading Paystack's own inline.js/PaystackPop client SDK at all — so there is no Paystack script to accidentally load site-wide in the first place. Confirmed via `git log --all -S "js.paystack.co"` and `-S "PaystackPop"` that this has been true for the entire git history of the project — never added, so nothing to have regressed.
+- Grepped the entire frontend/src for navigator.share, navigator.credentials, getInstalledRelatedApps, requestPermission, geolocation, mediaDevices, Bluetooth/USB APIs, and Notification: found exactly one hit, navigator.clipboard.writeText in ShareButton.jsx, which only runs inside an onClick handler (never on mount/page load), is not used on the Landing page, and clipboard-write doesn't trigger this class of native dialog regardless.
+- Checked index.html, main.jsx, and public/ for any external <script> tags, service worker registration, or a web app manifest (which could plausibly relate to native "app" prompts): none exist — index.html only loads a Google Fonts stylesheet and the app's own module script; no manifest.json, no service worker file anywhere in the repo.
+- Went a step further than static source review: loaded the actual live production site (https://settle-ng.vercel.app/) in a real browser, captured every network request the Landing page makes on load (7 total: the HTML document, one JS bundle, one CSS bundle, two Google Fonts requests, and one failed API call — see the urgent unrelated finding below), and downloaded the exact deployed, minified JS bundle to grep directly rather than trusting that the deployed build matches source. Found every `navigator.*` property referenced anywhere in the whole bundle: clipboard, connection, credentials, product, userAgent. The `navigator.credentials` hit is dead code from the @supabase/supabase-js SDK's WebAuthn/passkey support (`Ks()`/`qs()`/`Js()` in the bundle) — confirmed it's only feature-detection (`'credentials' in navigator && typeof navigator.credentials?.create === 'function'`), never actually invoked anywhere the app calls it, since SettleNG's own auth code only uses signInWithPassword/signUp/signOut/onAuthStateChange. No navigator.share, getInstalledRelatedApps, requestPermission, or any Bluetooth/USB/geolocation/mediaDevices reference anywhere in the deployed bundle at all.
+
+Expected result: no code path in the app (source or actual deployed bundle) could explain a native device-permission dialog firing on an un-interacted Landing page load.
+
+Actual result: confirmed — nothing found. This appears to NOT be caused by SettleNG's own code.
+
+Status: PARTIAL — code-level cause ruled out exhaustively; the actual native-dialog reproduction on a real Android device was NOT performed by Claude Code (no physical Android device or real mobile browser access from this environment). This needs a human tester on a real Android phone to close out.
+
+How to test this yourself:
+1. On a real Android phone, open Chrome in Incognito mode (extensions/other apps disabled by default there) and visit https://settle-ng.vercel.app/ fresh, with no other tabs or extensions active. If the dialog does NOT appear in Incognito, that confirms it's coming from something outside the app (a browser extension, an OS/manufacturer feature, or a Chrome flag) rather than from SettleNG's code, matching this investigation's conclusion.
+2. If it still appears even in a clean Incognito tab, that would contradict this investigation and needs re-opening — capture the exact dialog text and check chrome://webrtc-internals or chrome://settings/content on that device for which permission type it's actually requesting, since "access other apps and services" is Android's generic wording and doesn't say which underlying Web API triggered it.
+3. To re-run the code-side check yourself: grep the frontend for "paystack" and for navigator\. across frontend/src, and separately download the deployed JS bundle (see Network tab -> the main assets/index-*.js file) and grep it the same way — don't trust source alone, since a deployed bundle can lag behind source (see below).
+
+Notes / URGENT SEPARATE FINDING (unrelated to the permission-dialog investigation, found while checking the live site's network requests): the production frontend at https://settle-ng.vercel.app/ is calling `http://localhost:5050/api/properties` for its data — i.e. VITE_API_URL was not set (or not set correctly) when this bundle was built on Vercel, so it silently fell back to the dev-only localhost default baked in by frontend/src/lib/api.js. This means NO real API calls work at all on the live site right now (every fetch to the backend fails). This is a deployment configuration issue, not a code bug — per DEPLOYMENT.md, VITE_API_URL needs to be set in Vercel's project environment variables to the real deployed backend URL, then the frontend needs a redeploy. Flagging this prominently since it's a severe, currently-live production bug independent of what this task investigated.
+
+---
+Date: 2026-09-17
+Feature/Task: Add frontend/vercel.json SPA rewrite so client-side routes survive direct navigation/refresh
+Files changed:
+- frontend/vercel.json (new)
+
+What was tested (by Claude Code):
+- Created frontend/vercel.json with the standard SPA catch-all rewrite (`/(.*)` -> `/index.html`), validated it parses as well-formed JSON, and confirmed it's the only vercel.json anywhere in the repo (no conflicting config to reconcile).
+- Rebuilt the frontend from scratch (`npm run build`) and confirmed the actual deployable output in dist/ still contains index.html, sitemap.xml, and robots.txt as real, independent files sitting next to the assets/ folder — exactly what Vercel uploads as static assets alongside applying vercel.json's rewrites.
+- Served that exact dist/ build with `npm run preview` and confirmed: a direct request to a nested client-side route (`/properties`, simulating what happens after Vercel's rewrite serves index.html there) returns 200 and the real SPA shell (`<div id="root"></div>`), and separately that `/sitemap.xml` and `/robots.txt` are still served as their own real XML/text content (200, correct content), not swallowed by the SPA fallback.
+
+Expected result: vercel.json makes direct navigation/refresh on any client-side route (e.g. /properties/some-id) load the app instead of a Vercel 404, while sitemap.xml/robots.txt keep being served as themselves.
+
+Actual result: matches expected, to the extent testable from this environment (see caveat below).
+
+Status: PARTIAL — confirmed everything testable locally; the actual Vercel-platform rewrite behavior itself was NOT (and could not be) executed from this environment.
+
+How to test this yourself:
+1. After the next Vercel deploy, visit a nested route directly in a fresh browser tab (not by clicking a link inside the app) — e.g. https://settle-ng.vercel.app/properties — and confirm it loads the app instead of a 404. Then refresh that same page and confirm it still loads correctly.
+2. Visit https://settle-ng.vercel.app/sitemap.xml and https://settle-ng.vercel.app/robots.txt directly and confirm they return the real XML/text content, not the SPA's index.html.
+
+Notes: Vercel's rewrites only apply as a fallback AFTER checking for a real static file at that path — this is Vercel's own documented, load-bearing platform behavior (not an assumption): it's precisely why this exact catch-all pattern is Vercel's own officially recommended config for single-page apps. If rewrites took priority over real files, no Vercel-hosted SPA could ever serve its own JS/CSS bundle either, since those are also real files under the same rewrite pattern. Could not install/run the Vercel CLI in this environment to execute an actual `vercel dev`/deploy-level test of this specific config file (would also require the product owner's Vercel account access, which Claude Code doesn't have) — the local checks above (build output contents, and Vite's own preview server, which enforces the same "real file wins over SPA fallback" precedence) are the closest verification possible from here. The real, final confirmation is the two manual checks listed above, once this is deployed.
+
+---
+Date: 2026-09-17
+Feature/Task: Icon + text mobile filter-panel toggle on PropertyList.jsx
+Files changed:
+- frontend/src/pages/PropertyList.jsx (toggle button markup: added an inline SVG funnel icon and swapped "Show filters"/"Hide filters" text for "Filters"/"Close filters"; added aria-expanded)
+- frontend/src/index.css (.filters-toggle-icon sizing; .filters-toggle at max-width:1024px changed from display:inline-block to inline-flex with align-items/justify-content/gap:8px; new max-width:640px rule stacking .property-list-header into a column and making .filters-toggle width:100%)
+
+What was tested (by Claude Code):
+- No icon library exists in this project (package.json has only react/react-dom/react-router-dom/@supabase/supabase-js), and existing icon usage (FavoriteButton's heart, ReportButton's flag) is hand-drawn inline SVG, single-path, stroke-based (fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap/Linejoin="round"), 24x24 viewBox — matched that exact convention with a simple funnel-shaped path rather than pulling in a third-party icon set, per the task's own fallback instruction.
+- Confirmed the existing 44px mobile tap-target rule (`@media (max-width: 640px) { .btn-primary, .btn-secondary, ... { min-height: 44px } }`) already covers this button for free, since it keeps the `btn-secondary` class — no separate rule needed.
+- resize_window (browser automation) could not actually resize the real browser viewport in this session (confirmed broken again — window.innerWidth stayed fixed regardless of the tool's reported "success"), so instead of an unreliable full-viewport test, verified geometry precisely: rendered a live clone of the real button inside fixed-width containers sized to this app's actual inner content width at 375px (327px, after the page's 24px+24px padding) and at 768px (720px), with the exact CSS rules those breakpoints apply force-enabled, then measured real getBoundingClientRect() results and screenshotted both.
+  - At 375px-equivalent width: button rendered full-width (323px measured, matches container width), icon (18px) + "Filters" text centered together with a clean visible gap, height exactly 44px (meets the tap-target rule) — confirmed again with the longer open-state text "Close filters", which also fit on one line with no wrapping or overflow.
+  - At 768px-equivalent width: button rendered at its natural auto-width (~139px), not full-width (matches the intended mobile-only full-width rule, scoped to max-width:640px same as the existing tap-target convention), icon+text still centered with the same gap, no wrapping for either state's text. Height (~35px) is below 44px here, which is correct and consistent — the existing 44px tap-target rule has always only applied at max-width:640px in this app, not the wider max-width:1024px range where the toggle itself becomes visible, and this change doesn't alter that existing scope.
+  - At real desktop width (screenshotted live at 1568px): confirmed the toggle stays fully hidden (display:none, unchanged), exactly as before — the sidebar filter panel just shows inline as it always has.
+- Exercised the real click handler live (not just the cloned test copies): clicking the actual button flips its text between "Filters"/"Close filters", flips aria-expanded between "false"/"true", and adds/removes the .filters-sidebar's filters-open class — all correct.
+- Ran a full production build (`npm run build`) afterward: succeeded with no errors (same pre-existing unrelated >500kB chunk-size warning as every prior build check this project).
+
+Expected result: the mobile filter toggle shows a funnel icon + "Filters" (closed) or "Close filters" (open), styled as an outlined btn-secondary button, full-width on mobile, icon and text vertically centered with a small gap, meeting the existing 44px tap-target rule at mobile width, with no wrapping/overflow at any tested width, and no change to desktop (still fully hidden) or to the toggle's actual open/close behavior.
+
+Actual result: matches expected in every check above.
+
+Status: PASS (verified via precise fixed-width DOM rendering + live click test, since real browser-viewport resize was unavailable this session — see note)
+
+How to test this yourself:
+1. npm run dev in /frontend, open http://localhost:5173/properties.
+2. Resize the browser window (or use DevTools' device toolbar) to 375px wide: confirm the "Filters" button spans the full width under the "Browse properties" heading, with the funnel icon and text centered together: tap it and confirm it becomes a full-width "Close filters" button with the same icon, and the filter panel opens below it.
+3. Resize to 768px: confirm the button appears as a normal-width button next to the heading (not full-width), same icon+text styling, no wrapping.
+4. Resize above 1024px (desktop): confirm the button disappears entirely and the filter panel shows as a permanent left sidebar, same as before this change.
+
+Notes: Could not get the browser automation's resize_window tool to actually change the real viewport width in this session (window.innerWidth stayed stuck regardless of what was requested) — this is a known, recurring limitation of this environment, not specific to this task. The fixed-width-container method used here measures the real CSS/real button markup at the exact content widths mobile/tablet users would see, which is a rigorous substitute, but a real device-width screenshot is still worth doing as a final sanity check whenever that tooling is next working.
+
+---

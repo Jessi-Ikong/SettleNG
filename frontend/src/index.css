@@ -1000,6 +1000,12 @@ a {
   display: none;
 }
 
+.filters-toggle-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 .property-list-layout {
   display: flex;
   gap: 32px;
@@ -1088,7 +1094,10 @@ a {
 
 @media (max-width: 1024px) {
   .filters-toggle {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
 
   .property-list-layout {
@@ -1103,6 +1112,17 @@ a {
 
   .filters-sidebar.filters-open {
     display: block;
+  }
+}
+
+@media (max-width: 640px) {
+  .property-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters-toggle {
+    width: 100%;
   }
 }
 
