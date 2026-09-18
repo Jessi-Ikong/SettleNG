@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { fetchFavoritedIds } from '../lib/favoritesApi'
-import SearchFilters from '../components/SearchFilters'
+import FilterPillBar from '../components/FilterPillBar'
 import PropertyCard from '../components/PropertyCard'
 import useDocumentMeta from '../hooks/useDocumentMeta'
 
@@ -49,7 +49,6 @@ export default function PropertyList() {
   const [result, setResult] = useState({ items: [], total: 0, totalPages: 1 })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [favoritedIds, setFavoritedIds] = useState(new Set())
   const [showSaveSearch, setShowSaveSearch] = useState(false)
   const [saveSearchName, setSaveSearchName] = useState('')
@@ -153,39 +152,19 @@ export default function PropertyList() {
   const hasActiveFilters = FILTER_KEYS.some((key) => searchParams.get(key))
 
   return (
-    <div className="property-list-page">
-      <div className="property-list-header">
-        <h1>Browse properties</h1>
-        <button
-          type="button"
-          className="btn-secondary filters-toggle"
-          onClick={() => setFiltersOpen((open) => !open)}
-          aria-expanded={filtersOpen}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="filters-toggle-icon"
-            aria-hidden="true"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          >
-            <path d="M3 4H21L14 14V20H10V14Z" />
-          </svg>
-          {filtersOpen ? 'Close filters' : 'Filters'}
-        </button>
-      </div>
+    <>
+      <FilterPillBar
+        filters={filters}
+        sort={sort}
+        sortOptions={SORT_OPTIONS}
+        onChange={updateParams}
+        onSortChange={(value) => updateParams({ sort: value }, { resetPage: true })}
+      />
 
-      <div className="property-list-layout">
-        <aside className={filtersOpen ? 'filters-sidebar filters-open' : 'filters-sidebar'}>
-          <SearchFilters
-            filters={filters}
-            onChange={updateParams}
-            onClear={handleClearFilters}
-          />
-        </aside>
+      <div className="property-list-page">
+        <div className="property-list-header">
+          <h1>Browse properties</h1>
+        </div>
 
         <div className="property-list-main">
           <div className="property-list-toolbar">
@@ -195,65 +174,47 @@ export default function PropertyList() {
                 : `${result.total} propert${result.total === 1 ? 'y' : 'ies'} found`}
             </span>
 
-            <div className="toolbar-right">
-              {user && (
-                <div className="save-search">
-                  {showSaveSearch ? (
-                    <>
-                      <input
-                        type="text"
-                        placeholder="Search name"
-                        value={saveSearchName}
-                        onChange={(e) => setSaveSearchName(e.target.value)}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        onClick={handleSaveSearch}
-                        disabled={savingSearch}
-                      >
-                        {savingSearch ? 'Saving...' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        onClick={() => setShowSaveSearch(false)}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
+            {user && (
+              <div className="save-search">
+                {showSaveSearch ? (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Search name"
+                      value={saveSearchName}
+                      onChange={(e) => setSaveSearchName(e.target.value)}
+                      autoFocus
+                    />
                     <button
                       type="button"
                       className="btn-secondary"
-                      onClick={() => setShowSaveSearch(true)}
+                      onClick={handleSaveSearch}
+                      disabled={savingSearch}
                     >
-                      Save this search
+                      {savingSearch ? 'Saving...' : 'Save'}
                     </button>
-                  )}
-                  {saveSearchMessage && (
-                    <span className="save-search-message">{saveSearchMessage}</span>
-                  )}
-                </div>
-              )}
-
-              <label className="sort-select">
-                Sort by{' '}
-                <select
-                  value={sort}
-                  onChange={(e) =>
-                    updateParams({ sort: e.target.value }, { resetPage: true })
-                  }
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setShowSaveSearch(false)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowSaveSearch(true)}
+                  >
+                    Save this search
+                  </button>
+                )}
+                {saveSearchMessage && (
+                  <span className="save-search-message">{saveSearchMessage}</span>
+                )}
+              </div>
+            )}
           </div>
 
           {loading ? (
@@ -312,6 +273,6 @@ export default function PropertyList() {
           )}
         </div>
       </div>
-    </div>
+    </>
   )
 }

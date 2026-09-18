@@ -8,6 +8,18 @@ function formatNaira(amount) {
 export default function PropertyCard({ property, favorited, onToggleFavorite }) {
   const navigate = useNavigate()
   const unavailable = property.status !== 'available'
+  // Same three checks PropertyDetail.jsx uses for its own verification
+  // badges — reused here as-is. The list/card API shape doesn't
+  // currently join the owner's phone/identity verification (only
+  // ownership_verified lives directly on the property row), so in
+  // practice only ownership_verified ever lights this up today; it's
+  // written to match PropertyDetail's exact condition so it picks up
+  // the other two automatically if a future phase adds them here too.
+  const isVerified = Boolean(
+    property.owner_phone_verified ||
+      property.owner_identity_verified ||
+      property.ownership_verified,
+  )
 
   return (
     <Link
@@ -26,21 +38,44 @@ export default function PropertyCard({ property, favorited, onToggleFavorite }) 
             No photo
           </div>
         )}
+
+        <span
+          className={
+            'property-card-status-badge' +
+            (unavailable
+              ? ' badge-unavailable'
+              : ' badge-available')
+          }
+        >
+          {unavailable ? 'No longer available' : property.status}
+        </span>
+
         <FavoriteButton
           propertyId={property.id}
           initialFavorited={favorited}
           onToggle={onToggleFavorite}
         />
-      </div>
-      <div className="property-card-body">
-        {unavailable ? (
-          <span className="badge-unavailable">No longer available</span>
-        ) : (
-          <span className="badge-available">{property.status}</span>
+
+        {isVerified && (
+          <span className="property-card-verified-badge" title="Verified">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 13l4 4L19 7"
+                fill="none"
+                stroke="#fff"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
         )}
+
         {property.unit_label && (
           <span className="badge-unit-label">Unit {property.unit_label}</span>
         )}
+      </div>
+      <div className="property-card-body">
         <h3>{property.title}</h3>
         {property.building_id && (
           <button

@@ -50,12 +50,13 @@ Brand: **SettleNG** — "Find a place, verified before you move."
 
 Colors (use these exact hex values, referenced as CSS variables —
 do not substitute similar-looking colors):
-- `--color-indigo: #17304A` — primary brand, headers, nav, primary text on light bg
-- `--color-brass: #C68A2E` — verification badges/stamps, primary CTA
+- `--color-nav: #4A3728` — primary brand, headers, nav, primary buttons/CTAs
+- `--color-accent: #6B7A4F` — verification badges/"available"/success states
+  (also what `--color-success`/`--bg-success` resolve to — there is no
+  separate green anymore)
 - `--color-rust: #A8442D` — secondary accent, used sparingly (warnings/urgency only)
-- `--color-bg: #EDEAE2` — page background
+- `--color-bg: #EEEAD7` — page background
 - `--color-ink: #211D18` — body text (not pure black)
-- `--color-success: #3F6B3F` on `--bg-success: #EAF3DE` — "available"/verified states
 
 Typography:
 - Headlines: **Archivo** (weight 800/900)

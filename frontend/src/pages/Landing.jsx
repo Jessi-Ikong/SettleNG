@@ -50,11 +50,10 @@ export default function Landing() {
   return (
     <main className="landing-page">
       <section className="landing-hero">
-        <h1 className="wordmark">
-          <span className="wordmark-settle">Settle</span>
-          <span className="wordmark-ng">NG</span>
-        </h1>
-        <p className="tagline">Find a place, verified before you move.</p>
+        {/* Nav already shows the SettleNG wordmark once — this is the
+            page's own <h1>, not a second brand mark, so the tagline
+            fills that role instead of repeating it. */}
+        <h1 className="tagline">Find a place, verified before you move.</h1>
 
         <div className="landing-hero-ctas">
           <Link to="/properties" className="landing-cta landing-cta-primary">
